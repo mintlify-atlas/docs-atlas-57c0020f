@@ -1,0 +1,498 @@
+---
+title: 'Chat'
+description: 'Chat and conversation management endpoints'
+icon: 'messages'
+---
+
+## Overview
+
+The Chat API enables you to send messages to AI providers, manage conversations, and stream responses in real-time.
+
+---
+
+## Send Message
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/chat \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "What is machine learning?",
+    "provider": "claude",
+    "conversation_id": "user-123:web:conv-456"
+  }'
+```
+
+```bash With Image (Vision)
+curl -X POST https://api.asta.app/api/chat \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "What is in this image?",
+    "provider": "claude",
+    "image_base64": "iVBORw0KGgoAAAANSUhEUgAA...",
+    "image_mime": "image/png"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "reply": "Machine learning is a subset of artificial intelligence...",
+  "conversation_id": "user-123:web:conv-456",
+  "provider": "claude"
+}
+```
+
+</ResponseExample>
+
+### POST /api/chat
+
+Send a message to an AI provider and receive a complete response.
+
+#### Request Body
+
+<ParamField body="text" type="string" required>
+  The message text to send to the AI
+</ParamField>
+
+<ParamField body="provider" type="string" default="default">
+  AI provider to use. Options: `ollama`, `groq`, `google`, `claude`, `openai`, `openrouter`, or `default` (uses user's default provider)
+</ParamField>
+
+<ParamField body="conversation_id" type="string">
+  Conversation ID to continue an existing conversation. If not provided, a new conversation will be created.
+</ParamField>
+
+<ParamField body="mood" type="string">
+  Conversation mood/tone. Options: `serious`, `friendly`, or `normal`
+</ParamField>
+
+<ParamField body="web" type="boolean" default={false}>
+  If `true`, prefer web search and web fetch tools for the response
+</ParamField>
+
+<ParamField body="image_base64" type="string">
+  Base64-encoded image data for vision-capable models
+</ParamField>
+
+<ParamField body="image_mime" type="string">
+  MIME type of the image (e.g., `image/png`, `image/jpeg`)
+</ParamField>
+
+#### Response
+
+<ResponseField name="reply" type="string">
+  The AI's response text
+</ResponseField>
+
+<ResponseField name="conversation_id" type="string">
+  The conversation ID (newly created or the one provided in the request)
+</ResponseField>
+
+<ResponseField name="provider" type="string">
+  The actual provider used for the response
+</ResponseField>
+
+---
+
+## Stream Message
+
+<RequestExample>
+
+```bash cURL (SSE)
+curl -N -X POST https://api.asta.app/api/chat \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Explain quantum computing",
+    "provider": "claude"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.asta.app/api/chat', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    text: 'Explain quantum computing',
+    provider: 'claude'
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('event: ')) {
+      const eventType = line.substring(7);
+      const dataLine = lines[lines.indexOf(line) + 1];
+      if (dataLine?.startsWith('data: ')) {
+        const data = JSON.parse(dataLine.substring(6));
+        console.log(`Event: ${eventType}`, data);
+      }
+    }
+  }
+}
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```text SSE Stream
+event: meta
+data: {"type":"meta","conversation_id":"user-123:web:conv-789","provider":"claude"}
+
+event: assistant
+data: {"type":"assistant","delta":"Quantum"}
+
+event: assistant
+data: {"type":"assistant","delta":" computing"}
+
+event: assistant
+data: {"type":"assistant","delta":" is..."}
+
+event: done
+data: {"type":"done","reply":"Quantum computing is...","conversation_id":"user-123:web:conv-789","provider":"claude"}
+```
+
+</ResponseExample>
+
+### POST /api/chat
+
+Stream AI responses in real-time using Server-Sent Events (SSE). This endpoint provides token-by-token streaming of the AI's response.
+
+#### Request Body
+
+Accepts the same parameters as `/api/chat`.
+
+<ParamField body="text" type="string" required>
+  The message text to send to the AI
+</ParamField>
+
+<ParamField body="provider" type="string" default="default">
+  AI provider to use
+</ParamField>
+
+<ParamField body="conversation_id" type="string">
+  Conversation ID to continue an existing conversation
+</ParamField>
+
+<ParamField body="mood" type="string">
+  Conversation mood: `serious`, `friendly`, or `normal`
+</ParamField>
+
+<ParamField body="web" type="boolean" default={false}>
+  Enable web search/fetch tools
+</ParamField>
+
+<ParamField body="image_base64" type="string">
+  Base64-encoded image data
+</ParamField>
+
+<ParamField body="image_mime" type="string">
+  Image MIME type
+</ParamField>
+
+#### Response Events
+
+The endpoint returns Server-Sent Events with the following event types:
+
+<ResponseField name="meta" type="event">
+  Initial metadata event containing conversation ID and provider
+  
+  ```json
+  {
+    "type": "meta",
+    "conversation_id": "user-123:web:conv-789",
+    "provider": "claude"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="assistant" type="event">
+  Text delta events containing chunks of the AI's response
+  
+  ```json
+  {
+    "type": "assistant",
+    "delta": "text chunk"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="reasoning" type="event">
+  Reasoning/thinking events for models that support extended thinking
+  
+  ```json
+  {
+    "type": "reasoning",
+    "delta": "reasoning text"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="status" type="event">
+  Status updates (e.g., tool execution, web search)
+  
+  ```json
+  {
+    "type": "status",
+    "message": "Searching the web..."
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="done" type="event">
+  Final event with complete response
+  
+  ```json
+  {
+    "type": "done",
+    "reply": "Complete response text",
+    "conversation_id": "user-123:web:conv-789",
+    "provider": "claude"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="error" type="event">
+  Error event if something goes wrong
+  
+  ```json
+  {
+    "type": "error",
+    "error": "Error message",
+    "conversation_id": "user-123:web:conv-789",
+    "provider": "claude"
+  }
+  ```
+</ResponseField>
+
+---
+
+## List Conversations
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.asta.app/api/chat/conversations?channel=web&limit=20" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "conversations": [
+    {
+      "id": "user-123:web:conv-456",
+      "user_id": "user-123",
+      "channel": "web",
+      "created_at": "2026-03-06T10:30:00Z",
+      "updated_at": "2026-03-06T11:45:00Z",
+      "folder_id": null
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+### GET /api/chat/conversations
+
+Retrieve a list of conversations for the authenticated user.
+
+#### Query Parameters
+
+<ParamField query="channel" type="string" default="web">
+  Filter conversations by channel
+</ParamField>
+
+<ParamField query="limit" type="integer" default={50}>
+  Maximum number of conversations to return (1-100)
+</ParamField>
+
+#### Response
+
+<ResponseField name="conversations" type="array">
+  Array of conversation objects
+</ResponseField>
+
+---
+
+## Get Conversation Messages
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.asta.app/api/chat/messages?conversation_id=user-123:web:conv-456&limit=50" \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "conversation_id": "user-123:web:conv-456",
+  "messages": [
+    {
+      "id": "msg-1",
+      "role": "user",
+      "content": "What is machine learning?",
+      "created_at": "2026-03-06T10:30:00Z"
+    },
+    {
+      "id": "msg-2",
+      "role": "assistant",
+      "content": "Machine learning is...",
+      "created_at": "2026-03-06T10:30:15Z"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+### GET /api/chat/messages
+
+Retrieve messages from a specific conversation.
+
+#### Query Parameters
+
+<ParamField query="conversation_id" type="string" required>
+  The conversation ID to retrieve messages from
+</ParamField>
+
+<ParamField query="limit" type="integer" default={50}>
+  Maximum number of messages to return (1-100)
+</ParamField>
+
+#### Response
+
+<ResponseField name="conversation_id" type="string">
+  The conversation ID
+</ResponseField>
+
+<ResponseField name="messages" type="array">
+  Array of message objects ordered by creation time
+</ResponseField>
+
+---
+
+## Delete Conversation
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://api.asta.app/api/chat/conversations/user-123:web:conv-456 \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "ok": true
+}
+```
+
+</ResponseExample>
+
+### DELETE /api/chat/conversations/{conversation_id}
+
+Delete a conversation and all its messages.
+
+<ParamField path="conversation_id" type="string" required>
+  The ID of the conversation to delete
+</ParamField>
+
+#### Error Responses
+
+- **403 Forbidden**: Conversation does not belong to the authenticated user
+
+---
+
+## Truncate Conversation
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/chat/conversations/user-123:web:conv-456/truncate \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keep_count": 10
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "ok": true,
+  "conversation_id": "user-123:web:conv-456",
+  "keep_count": 10,
+  "deleted": 25
+}
+```
+
+</ResponseExample>
+
+### POST /api/chat/conversations/{conversation_id}/truncate
+
+Remove old messages from a conversation, keeping only the most recent messages.
+
+<ParamField path="conversation_id" type="string" required>
+  The ID of the conversation to truncate
+</ParamField>
+
+<ParamField body="keep_count" type="integer" default={0}>
+  Number of recent messages to keep. Set to 0 to delete all messages.
+</ParamField>
+
+#### Response
+
+<ResponseField name="ok" type="boolean">
+  Success status
+</ResponseField>
+
+<ResponseField name="conversation_id" type="string">
+  The conversation ID
+</ResponseField>
+
+<ResponseField name="keep_count" type="integer">
+  Number of messages kept
+</ResponseField>
+
+<ResponseField name="deleted" type="integer">
+  Number of messages deleted
+</ResponseField>
+
+#### Error Responses
+
+- **403 Forbidden**: Conversation does not belong to the authenticated user

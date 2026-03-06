@@ -1,0 +1,255 @@
+---
+title: 'Spotify'
+description: 'Connect Spotify account and control playback'
+---
+
+## Get OAuth URL
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/spotify/connect \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "url": "https://accounts.spotify.com/authorize?client_id=..."
+}
+```
+</ResponseExample>
+
+Redirects the user to Spotify's authorization page. After authorization, Spotify will redirect back to `/api/spotify/callback` with an authorization code.
+
+<Note>
+You must configure a Spotify app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add the redirect URI (`http://127.0.0.1:8010/api/spotify/callback` for local development) to your app settings.
+</Note>
+
+---
+
+## OAuth Callback
+
+<RequestExample>
+```bash
+# This endpoint is called by Spotify after user authorization
+GET /api/spotify/callback?code=...&state=...
+```
+</RequestExample>
+
+<ParamField query="code" type="string" required>
+  Authorization code from Spotify
+</ParamField>
+
+<ParamField query="state" type="string" required>
+  User ID passed during authorization
+</ParamField>
+
+<ParamField query="error" type="string" optional>
+  Error message if authorization failed
+</ParamField>
+
+Exchanges the authorization code for access and refresh tokens, stores them securely, and redirects the user to the frontend settings page.
+
+<Note>
+This endpoint is typically not called directly by your application. It's the redirect URI that Spotify calls after user authorization.
+</Note>
+
+---
+
+## Get Devices
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/spotify/devices \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "devices": [
+    {
+      "id": "abc123",
+      "name": "MacBook Pro",
+      "type": "Computer",
+      "is_active": true,
+      "is_private_session": false,
+      "is_restricted": false,
+      "volume_percent": 50
+    },
+    {
+      "id": "def456",
+      "name": "iPhone",
+      "type": "Smartphone",
+      "is_active": false,
+      "is_private_session": false,
+      "is_restricted": false,
+      "volume_percent": 100
+    }
+  ],
+  "connected": true
+}
+```
+</ResponseExample>
+
+<ResponseField name="devices" type="array">
+  List of available Spotify devices
+  <Expandable title="properties">
+    <ResponseField name="id" type="string">
+      Unique device identifier
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Device display name
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Device type (e.g., Computer, Smartphone, Speaker)
+    </ResponseField>
+    <ResponseField name="is_active" type="boolean">
+      Whether playback is currently active on this device
+    </ResponseField>
+    <ResponseField name="volume_percent" type="number">
+      Current volume (0-100)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="connected" type="boolean">
+  Whether any devices are available
+</ResponseField>
+
+---
+
+## Start Playback
+
+<RequestExample>
+```bash
+curl -X POST https://api.asta.app/api/spotify/play \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "track_uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+    "device_id": "abc123"
+  }'
+```
+</RequestExample>
+
+<ParamField body="track_uri" type="string" required>
+  Spotify URI of the track to play (e.g., `spotify:track:4cOdK2wGLETKBW3PvgPWqT`)
+</ParamField>
+
+<ParamField body="device_id" type="string" optional>
+  Device ID to play on. If omitted, plays on the active device.
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "error": null
+}
+```
+</ResponseExample>
+
+<ResponseField name="ok" type="boolean">
+  Whether playback started successfully
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if playback failed
+</ResponseField>
+
+<Warning>
+Playback requires an active Spotify Premium account and at least one device with Spotify open.
+</Warning>
+
+---
+
+## Get Connection Status
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/spotify/status \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "connected": true
+}
+```
+</ResponseExample>
+
+<ResponseField name="connected" type="boolean">
+  Whether the user has authorized Spotify access
+</ResponseField>
+
+---
+
+## Disconnect Spotify
+
+<RequestExample>
+```bash
+curl -X POST https://api.asta.app/api/spotify/disconnect \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "disconnected": true
+}
+```
+</ResponseExample>
+
+Clears stored access and refresh tokens. The user will need to re-authorize to use Spotify features again.
+
+---
+
+## Setup Instructions
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/spotify/setup \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "dashboard_url": "https://developer.spotify.com/dashboard",
+  "docs_url": "https://developer.spotify.com/documentation/web-api",
+  "redirect_uri": "http://127.0.0.1:8010/api/spotify/callback",
+  "connect_url": "http://127.0.0.1:8010/api/spotify/connect?user_id=default",
+  "steps": [
+    "Go to the Spotify Developer Dashboard (link below) and log in with your Spotify account.",
+    "Click Create app. Fill in name and description (e.g. Asta), accept the terms, then Create.",
+    "Open your app → Settings. Copy Client ID and Client secret and paste them below.",
+    "For playback on your devices: in the app settings under Redirect URIs, add: http://127.0.0.1:8010/api/spotify/callback then Save."
+  ]
+}
+```
+</ResponseExample>
+
+Returns setup instructions and configuration URLs for the Spotify integration.
+
+<ResponseField name="dashboard_url" type="string">
+  URL to Spotify Developer Dashboard
+</ResponseField>
+
+<ResponseField name="redirect_uri" type="string">
+  OAuth redirect URI to configure in Spotify app
+</ResponseField>
+
+<ResponseField name="connect_url" type="string">
+  URL to start OAuth flow
+</ResponseField>
+
+<ResponseField name="steps" type="array">
+  Step-by-step setup instructions
+</ResponseField>

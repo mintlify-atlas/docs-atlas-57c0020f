@@ -1,0 +1,641 @@
+---
+title: 'Installation'
+description: 'Complete installation guide for all platforms'
+---
+
+Native installation guide for Asta on Linux, macOS, and Windows. No Docker required.
+
+## Requirements
+
+<CardGroup cols={3}>
+  <Card title="Backend" icon="python">
+    **Python 3.12 or 3.13**
+    
+    (3.14 not supported yet)
+  </Card>
+  
+  <Card title="Desktop App" icon="laptop">
+    **Node.js 18+**
+    
+    **Rust toolchain**
+  </Card>
+  
+  <Card title="Optional" icon="server">
+    **Ollama**
+    
+    For local AI and RAG
+  </Card>
+</CardGroup>
+
+<Warning>
+  **Python 3.14 is not yet supported** due to pydantic and ChromaDB compatibility issues. Use Python 3.12 or 3.13.
+</Warning>
+
+---
+
+## Quick Install (Linux / macOS)
+
+The fastest way to get started using the control script:
+
+```bash
+git clone https://github.com/helloworldxdwastaken/asta.git
+cd asta
+cp .env.example backend/.env
+# Edit backend/.env with your API keys (optional for first run)
+
+./asta.sh start
+```
+
+Open **http://localhost:8010/docs** for API documentation. The desktop app connects to `http://localhost:8010`.
+
+---
+
+## Platform-Specific Installation
+
+<Tabs>
+  <Tab title="macOS">
+    ### Prerequisites
+
+    Install Python 3.12 or 3.13 using Homebrew:
+
+    ```bash
+    brew install python@3.12
+    ```
+
+    ### Backend Setup
+
+    ```bash
+    cd backend
+    python3.12 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
+
+    ### Start Backend
+
+    ```bash
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
+    ```
+
+    Or use the control script:
+
+    ```bash
+    ./asta.sh start
+    ```
+
+    ### Desktop App
+
+    Install dependencies and run in development mode:
+
+    ```bash
+    cd MACWinApp/asta-app
+    npm install
+    npx tauri dev
+    ```
+
+    ### Build Release (DMG)
+
+    ```bash
+    cd MACWinApp/asta-app
+    npx tauri build
+    ```
+
+    The DMG will be created in `src-tauri/target/release/bundle/dmg/`.
+
+    <Note>
+      **Apple Notes Integration:** When running the backend, launch it from Terminal (not as a background service). The first time you ask Asta to check notes, macOS will prompt for permission. Approve it so the backend process can access Notes.
+    </Note>
+  </Tab>
+
+  <Tab title="Linux">
+    ### Prerequisites
+
+    Install Python 3.12 or 3.13:
+
+    ```bash
+    # Ubuntu/Debian
+    sudo apt update
+    sudo apt install python3.12 python3.12-venv
+
+    # Fedora
+    sudo dnf install python3.12
+
+    # Arch
+    sudo pacman -S python
+    ```
+
+    ### Backend Setup
+
+    ```bash
+    cd backend
+    python3.12 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
+
+    ### Start Backend
+
+    ```bash
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
+    ```
+
+    Or use the control script:
+
+    ```bash
+    ./asta.sh start
+    ```
+
+    ### Desktop App
+
+    Install Node.js and Rust:
+
+    ```bash
+    # Node.js (Ubuntu/Debian)
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+
+    # Rust
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    ```
+
+    Build and run:
+
+    ```bash
+    cd MACWinApp/asta-app
+    npm install
+    npx tauri dev
+    ```
+
+    <Tip>
+      Run `./asta.sh install` to add the `asta` command to your PATH for system-wide access.
+    </Tip>
+  </Tab>
+
+  <Tab title="Windows">
+    ### Prerequisites
+
+    1. **Python 3.12 or 3.13** from [python.org](https://www.python.org/downloads/)
+    2. **Node.js 18+** from [nodejs.org](https://nodejs.org/)
+    3. **Rust** from [rustup.rs](https://rustup.rs/)
+
+    ### Environment Setup
+
+    ```powershell
+    copy .env.example backend\.env
+    # Edit backend\.env with your API keys
+    ```
+
+    ### Backend Setup
+
+    ```powershell
+    cd backend
+    python -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    ```
+
+    ### Start Backend
+
+    ```powershell
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
+    ```
+
+    ### Desktop App
+
+    ```powershell
+    cd MACWinApp\asta-app
+    npm install
+    npx tauri dev     # Development mode
+    npx tauri build   # Build MSI installer
+    ```
+
+    The MSI installer will be created in `src-tauri\target\release\bundle\msi\`.
+
+    <Note>
+      Open PowerShell as Administrator if you encounter permission issues during installation.
+    </Note>
+  </Tab>
+</Tabs>
+
+---
+
+## Environment Configuration
+
+Copy `.env.example` to `backend/.env` and configure your settings:
+
+```bash
+cp .env.example backend/.env
+```
+
+### Essential Variables
+
+<ParamField path="GROQ_API_KEY" type="string">
+  Groq API key (recommended for speed)
+</ParamField>
+
+<ParamField path="GEMINI_API_KEY" type="string">
+  Google Gemini API key
+</ParamField>
+
+<ParamField path="ANTHROPIC_API_KEY" type="string">
+  Claude API key from Anthropic
+</ParamField>
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  OpenAI API key
+</ParamField>
+
+<ParamField path="OPENROUTER_API_KEY" type="string">
+  OpenRouter API key (access to 300+ models)
+</ParamField>
+
+<ParamField path="OLLAMA_BASE_URL" type="string" default="http://localhost:11434">
+  Ollama server URL for local AI
+</ParamField>
+
+### Security Settings
+
+<ParamField path="ASTA_ALLOWED_PATHS" type="string">
+  Comma-separated directories for file access (e.g., `/Users/you/Documents,/Users/you/Notes`)
+</ParamField>
+
+<ParamField path="ASTA_EXEC_ALLOWED_BINS" type="string">
+  Comma-separated list of executable binaries Asta can run (e.g., `memo,things`)
+</ParamField>
+
+<ParamField path="ASTA_EXEC_SECURITY" type="string" default="allowlist">
+  Execution security mode:
+  - `allowlist` - Only allowed binaries (default, recommended)
+  - `full` - Allow any command (dangerous)
+  - `deny` - Disable exec completely
+</ParamField>
+
+<ParamField path="ASTA_JWT_SECRET" type="string">
+  JWT signing secret (auto-generated on first login if not set)
+</ParamField>
+
+### Optional Integrations
+
+<ParamField path="TELEGRAM_BOT_TOKEN" type="string">
+  Bot token from [@BotFather](https://t.me/BotFather)
+</ParamField>
+
+<ParamField path="SPOTIFY_CLIENT_ID" type="string">
+  Spotify app client ID from [developer dashboard](https://developer.spotify.com/dashboard)
+</ParamField>
+
+<ParamField path="SPOTIFY_CLIENT_SECRET" type="string">
+  Spotify app client secret
+</ParamField>
+
+<ParamField path="HUGGINGFACE_API_KEY" type="string">
+  Hugging Face token for FLUX.1-dev image generation fallback
+</ParamField>
+
+---
+
+## Multi-User Authentication
+
+On first run with no users in the database, Asta operates in **single-user mode** (open access, no login required).
+
+### Enable Multi-User Mode
+
+Create the first admin user via the API (while in single-user mode):
+
+```bash
+curl -X POST http://localhost:8010/api/auth/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password", "role": "admin"}'
+```
+
+After creating the first user:
+1. The desktop app will show a **login screen**
+2. Sign in with the admin credentials
+3. Admin can create additional users from **Settings → Users**
+4. Users can self-register via the login page
+
+### User Roles
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="crown">
+    **Full Access**
+    
+    - All settings and configuration
+    - User management
+    - Skills, tools, and agents
+    - Exec, files, and reminders
+  </Card>
+  
+  <Card title="User" icon="user">
+    **Limited Access**
+    
+    - Chat with safe tools only
+    - Web search, weather, math, GIFs, PDF, time
+    - No settings or admin features
+    - No exec, files, or reminders
+  </Card>
+</CardGroup>
+
+<Note>
+  JWT tokens are auto-generated on first login and stored in `backend/.env` as `ASTA_JWT_SECRET`. Tokens expire after 30 days.
+</Note>
+
+---
+
+## Optional: Ollama Setup
+
+Ollama provides local AI inference and embeddings for RAG (learning/knowledge).
+
+### Install Ollama
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    brew install ollama
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    ```bash
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
+  </Tab>
+  
+  <Tab title="Windows">
+    Download from [ollama.com](https://ollama.com/download/windows)
+  </Tab>
+</Tabs>
+
+### Setup for RAG
+
+Use the provided setup script:
+
+```bash
+./scripts/setup_ollama_rag.sh
+```
+
+Or manually:
+
+```bash
+ollama pull nomic-embed-text
+ollama serve
+```
+
+Set the base URL in `backend/.env`:
+
+```bash
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+<Note>
+  If Ollama is unavailable, learning/RAG endpoints will be disabled until it's running.
+</Note>
+
+---
+
+## Control Script Reference
+
+The `asta.sh` script provides commands for managing the backend:
+
+<CodeGroup>
+```bash Start
+./asta.sh start
+# Creates venv, installs deps, starts backend
+```
+
+```bash Stop
+./asta.sh stop
+# Stops backend and frees port 8010
+```
+
+```bash Restart
+./asta.sh restart
+# Stops then starts (useful after config changes)
+```
+
+```bash Status
+./asta.sh status
+# Shows backend status, channels, and skills
+```
+
+```bash Diagnostics
+./asta.sh doc
+# Safe diagnostics (setup + service checks)
+```
+
+```bash Auto-Fix
+./asta.sh doc --fix
+# Diagnostics + auto-fix common issues
+```
+
+```bash Update
+./asta.sh update
+# Pull latest code and restart
+```
+
+```bash Install
+./asta.sh install
+# Symlink asta to /usr/local/bin
+```
+
+```bash Setup
+./asta.sh setup
+# Create backend venv (Python 3.12/3.13)
+```
+</CodeGroup>
+
+### What `asta.sh start` Does
+
+<Steps>
+  <Step title="Python Detection">
+    Searches for `python3.12`, `python3.13`, or compatible `python3` (skips 3.14+)
+  </Step>
+
+  <Step title="Virtual Environment">
+    Creates `.venv` in backend directory if it doesn't exist
+  </Step>
+
+  <Step title="Dependencies">
+    Installs all packages from `requirements.txt`
+  </Step>
+
+  <Step title="Port Management">
+    Frees port 8010 if occupied by previous instances
+  </Step>
+
+  <Step title="Database Cleanup">
+    Releases any stale SQLite locks
+  </Step>
+
+  <Step title="Tailscale Integration">
+    Auto-starts Tailscale if installed for remote access
+  </Step>
+
+  <Step title="Background Process">
+    Starts uvicorn as a background daemon
+  </Step>
+
+  <Step title="Health Check">
+    Waits up to 25 seconds for API to respond
+  </Step>
+</Steps>
+
+---
+
+## Pre-Built Releases
+
+For end users who don't want to build from source:
+
+Download the latest release from [GitHub Releases](https://github.com/helloworldxdwastaken/asta/releases):
+
+<CardGroup cols={3}>
+  <Card title="macOS (Apple Silicon)" icon="apple">
+    `Asta_<version>_aarch64.dmg`
+  </Card>
+  
+  <Card title="macOS (Intel)" icon="apple">
+    `Asta_<version>_x64.dmg`
+  </Card>
+  
+  <Card title="Windows" icon="windows">
+    `Asta_<version>_x64-setup.msi`
+  </Card>
+</CardGroup>
+
+Install the DMG/MSI, then start the backend separately:
+
+```bash
+./asta.sh start
+```
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Address already in use (8010)">
+    The port is occupied by a previous instance:
+    
+    ```bash
+    ./asta.sh restart
+    ```
+    
+    Or manually kill the process:
+    
+    ```bash
+    lsof -ti:8010 | xargs kill -9
+    ```
+  </Accordion>
+
+  <Accordion title="Cannot reach Asta API / API off">
+    Backend is not running. Start it:
+    
+    ```bash
+    ./asta.sh start
+    ```
+    
+    Or manually:
+    
+    ```bash
+    cd backend
+    source .venv/bin/activate
+    uvicorn app.main:app --host 0.0.0.0 --port 8010
+    ```
+  </Accordion>
+
+  <Accordion title="No AI provider available">
+    Add at least one API key to `backend/.env`:
+    
+    ```bash
+    GROQ_API_KEY=gsk_...
+    # or GEMINI_API_KEY, OPENAI_API_KEY, etc.
+    ```
+    
+    Then restart:
+    
+    ```bash
+    ./asta.sh restart
+    ```
+  </Accordion>
+
+  <Accordion title="Backend can't find .env">
+    The backend reads `backend/.env` only (not root `.env`):
+    
+    ```bash
+    cp .env.example backend/.env
+    ```
+  </Accordion>
+
+  <Accordion title="Wrong Python version">
+    Install Python 3.12 or 3.13:
+    
+    ```bash
+    # macOS
+    brew install python@3.12
+    
+    # Ubuntu/Debian
+    sudo apt install python3.12 python3.12-venv
+    ```
+  </Accordion>
+
+  <Accordion title="Reminders not firing">
+    Reminders are loaded on backend startup. Restart once:
+    
+    ```bash
+    ./asta.sh restart
+    ```
+  </Accordion>
+
+  <Accordion title="faster-whisper is not installed (audio notes)">
+    Reinstall dependencies:
+    
+    ```bash
+    cd backend
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
+    
+    First run may download the Whisper model (~140 MB).
+  </Accordion>
+
+  <Accordion title="Tauri build fails">
+    Ensure you have the Rust toolchain:
+    
+    ```bash
+    # Install Rust
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    
+    # Update Rust
+    rustup update
+    ```
+    
+    Then try building again:
+    
+    ```bash
+    cd MACWinApp/asta-app
+    npx tauri build
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/configuration">
+    Configure API keys, skills, and advanced settings
+  </Card>
+  
+  <Card title="Desktop App" icon="window" href="/desktop-app">
+    Learn about the Tauri-based desktop application
+  </Card>
+  
+  <Card title="Telegram Bot" icon="paper-plane" href="/telegram">
+    Set up Telegram integration for mobile access
+  </Card>
+  
+  <Card title="Skills" icon="wand-magic-sparkles" href="/skills">
+    Enable and configure built-in skills
+  </Card>
+</CardGroup>

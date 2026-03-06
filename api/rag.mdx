@@ -1,0 +1,298 @@
+---
+title: "RAG API"
+description: "Learn topics and retrieve knowledge with vector search"
+---
+
+The RAG (Retrieval-Augmented Generation) API allows you to ingest text under topics and later query them using semantic search. Asta uses Ollama's `nomic-embed-text` model for embeddings and ChromaDB for vector storage.
+
+---
+
+## Check RAG Status
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/rag/status"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "chromadb": true,
+  "embedding_provider": "ollama"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/rag/status
+```
+
+Check if RAG is working (ChromaDB + at least one embedding provider).
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Whether RAG system is operational
+</ResponseField>
+
+<ResponseField name="chromadb" type="boolean">
+  ChromaDB connection status
+</ResponseField>
+
+<ResponseField name="embedding_provider" type="string">
+  Active embedding provider (e.g., "ollama")
+</ResponseField>
+
+---
+
+## Learn Topic
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/rag/learn" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "product-docs",
+    "text": "Asta is a personal AI workspace that runs locally. It provides file management, RAG, audio transcription, and cron jobs.",
+    "doc_id": "readme-intro"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "topic": "product-docs"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+POST /api/rag/learn
+```
+
+Ingest text under a topic for later retrieval.
+
+### Request Body
+
+<ParamField body="topic" type="string" required>
+  Topic name to organize learned content (e.g., "product-docs", "meeting-notes")
+</ParamField>
+
+<ParamField body="text" type="string" required>
+  Text content to learn and embed
+</ParamField>
+
+<ParamField body="doc_id" type="string">
+  Optional document ID for tracking and deduplication
+</ParamField>
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Success indicator
+</ResponseField>
+
+<ResponseField name="topic" type="string">
+  The topic that was learned
+</ResponseField>
+
+---
+
+## Query RAG
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/rag/ask" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What features does Asta provide?",
+    "topic": "product-docs",
+    "k": 5
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "summary": "Asta provides file management, RAG (retrieval-augmented generation), audio transcription, and cron jobs. It runs locally as a personal AI workspace..."
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+POST /api/rag/ask
+```
+
+Retrieve relevant context for a question using semantic search.
+
+### Request Body
+
+<ParamField body="question" type="string" required>
+  The question to search for
+</ParamField>
+
+<ParamField body="topic" type="string">
+  Filter results to a specific topic (omit to search all topics)
+</ParamField>
+
+<ParamField body="k" type="number" default={5}>
+  Number of top results to return
+</ParamField>
+
+### Response
+
+<ResponseField name="summary" type="string">
+  Aggregated context from matching chunks
+</ResponseField>
+
+---
+
+## List Learned Topics
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/rag/learned"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "has_learned": true,
+  "topics": [
+    {
+      "name": "product-docs",
+      "chunks": 42
+    },
+    {
+      "name": "meeting-notes",
+      "chunks": 15
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/rag/learned
+```
+
+List all topics and their chunk counts.
+
+### Response
+
+<ResponseField name="has_learned" type="boolean">
+  Whether any content has been learned
+</ResponseField>
+
+<ResponseField name="topics" type="object[]">
+  List of topics
+  <ResponseField name="topics[].name" type="string">
+    Topic name
+  </ResponseField>
+  <ResponseField name="topics[].chunks" type="number">
+    Number of embedded chunks
+  </ResponseField>
+</ResponseField>
+
+---
+
+## Manage Topics
+
+### Get Topic Content
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/rag/topic/product-docs"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "topic": "product-docs",
+  "content": "Asta is a personal AI workspace...\n\nFeatures include..."
+}
+```
+</ResponseExample>
+
+```
+GET /api/rag/topic/{topic}
+```
+
+### Update Topic Content
+
+<RequestExample>
+```bash cURL
+curl -X PUT "http://localhost:8000/api/rag/topic/product-docs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Updated product documentation..."
+  }'
+```
+</RequestExample>
+
+```
+PUT /api/rag/topic/{topic}
+```
+
+<ParamField body="content" type="string" required>
+  New content to replace existing topic content
+</ParamField>
+
+### Delete Topic
+
+<RequestExample>
+```bash cURL
+curl -X DELETE "http://localhost:8000/api/rag/topic/product-docs"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "topic": "product-docs",
+  "deleted_chunks": 42
+}
+```
+</ResponseExample>
+
+```
+DELETE /api/rag/topic/{topic}
+```
+
+Deletes all chunks for the specified topic.
+
+---
+
+## Check Ollama Connection
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/rag/check-ollama?url=http://localhost:11434"
+```
+</RequestExample>
+
+```
+GET /api/rag/check-ollama
+```
+
+<ParamField query="url" type="string" required>
+  Ollama URL to test connection (e.g., `http://localhost:11434`)
+</ParamField>
+
+Check if Ollama is reachable at the given URL (for UI connection testing).

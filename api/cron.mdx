@@ -1,0 +1,325 @@
+---
+title: "Cron Jobs API"
+description: "Schedule recurring AI tasks with cron expressions"
+---
+
+The Cron API enables scheduling of recurring jobs using standard 5-field cron expressions. Jobs can trigger AI messages, API calls, or custom payloads at specified intervals.
+
+---
+
+## List Cron Jobs
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/cron" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "cron_jobs": [
+    {
+      "id": 1,
+      "user_id": "default",
+      "name": "daily-standup",
+      "cron_expr": "0 9 * * 1-5",
+      "tz": "America/New_York",
+      "message": "Generate daily standup report",
+      "enabled": true,
+      "channel": "web",
+      "channel_target": "",
+      "payload_kind": "agentturn",
+      "tlg_call": true,
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/cron
+```
+
+List all cron jobs for the current user.
+
+### Response
+
+<ResponseField name="cron_jobs" type="object[]">
+  Array of cron jobs
+  <ResponseField name="cron_jobs[].id" type="number">
+    Unique job identifier
+  </ResponseField>
+  <ResponseField name="cron_jobs[].name" type="string">
+    Job name (unique per user)
+  </ResponseField>
+  <ResponseField name="cron_jobs[].cron_expr" type="string">
+    5-field cron expression (e.g., `0 9 * * 1-5`)
+  </ResponseField>
+  <ResponseField name="cron_jobs[].tz" type="string">
+    Timezone (e.g., `America/New_York`)
+  </ResponseField>
+  <ResponseField name="cron_jobs[].message" type="string">
+    Message or task to execute
+  </ResponseField>
+  <ResponseField name="cron_jobs[].enabled" type="boolean">
+    Whether the job is active
+  </ResponseField>
+  <ResponseField name="cron_jobs[].channel" type="string">
+    Delivery channel (e.g., `web`, `telegram`)
+  </ResponseField>
+  <ResponseField name="cron_jobs[].payload_kind" type="string">
+    Payload type (e.g., `agentturn`)
+  </ResponseField>
+</ResponseField>
+
+---
+
+## Create Cron Job
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/cron" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "daily-standup",
+    "cron_expr": "0 9 * * 1-5",
+    "message": "Generate daily standup report",
+    "tz": "America/New_York",
+    "channel": "web",
+    "payload_kind": "agentturn",
+    "tlg_call": true
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "id": 1,
+  "name": "daily-standup",
+  "cron_expr": "0 9 * * 1-5"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+POST /api/cron
+```
+
+Create a new recurring cron job.
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Unique job name (per user)
+</ParamField>
+
+<ParamField body="cron_expr" type="string" required>
+  5-field cron expression (e.g., `0 9 * * 1-5` = weekdays at 9 AM)
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Task description or message to execute
+</ParamField>
+
+<ParamField body="tz" type="string">
+  Timezone (e.g., `America/New_York`, `UTC`). Defaults to system timezone.
+</ParamField>
+
+<ParamField body="channel" type="string" default="web">
+  Delivery channel (e.g., `web`, `telegram`)
+</ParamField>
+
+<ParamField body="channel_target" type="string" default="">
+  Target identifier for the channel (e.g., Telegram chat ID)
+</ParamField>
+
+<ParamField body="payload_kind" type="string" default="agentturn">
+  Payload type for execution
+</ParamField>
+
+<ParamField body="tlg_call" type="boolean" default={true}>
+  Whether to trigger Telegram notification
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="number">
+  Created job ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Job name
+</ResponseField>
+
+<ResponseField name="cron_expr" type="string">
+  Cron expression
+</ResponseField>
+
+---
+
+## Update Cron Job
+
+<RequestExample>
+```bash cURL
+curl -X PUT "http://localhost:8000/api/cron/1" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cron_expr": "0 10 * * 1-5",
+    "enabled": true
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "id": 1,
+  "name": "daily-standup",
+  "cron_expr": "0 10 * * 1-5",
+  "tz": "America/New_York"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+PUT /api/cron/{job_id}
+```
+
+Update an existing cron job. The job is automatically rescheduled.
+
+### Path Parameters
+
+<ParamField path="job_id" type="number" required>
+  Job ID to update
+</ParamField>
+
+### Request Body (all fields optional)
+
+<ParamField body="name" type="string">
+  New job name
+</ParamField>
+
+<ParamField body="cron_expr" type="string">
+  New cron expression
+</ParamField>
+
+<ParamField body="tz" type="string">
+  New timezone
+</ParamField>
+
+<ParamField body="message" type="string">
+  New message/task
+</ParamField>
+
+<ParamField body="enabled" type="boolean">
+  Enable or disable the job
+</ParamField>
+
+<ParamField body="payload_kind" type="string">
+  New payload type
+</ParamField>
+
+<ParamField body="tlg_call" type="boolean">
+  Enable/disable Telegram notifications
+</ParamField>
+
+<ParamField body="channel" type="string">
+  New channel
+</ParamField>
+
+<ParamField body="channel_target" type="string">
+  New channel target
+</ParamField>
+
+---
+
+## Delete Cron Job
+
+<RequestExample>
+```bash cURL
+curl -X DELETE "http://localhost:8000/api/cron/1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "id": 1
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+DELETE /api/cron/{job_id}
+```
+
+Delete a cron job and remove it from the scheduler.
+
+### Path Parameters
+
+<ParamField path="job_id" type="number" required>
+  Job ID to delete
+</ParamField>
+
+---
+
+## Cron Expression Format
+
+Asta uses standard 5-field cron expressions:
+
+```
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ │ ┌───────────── day of month (1 - 31)
+│ │ │ ┌───────────── month (1 - 12)
+│ │ │ │ ┌───────────── day of week (0 - 6) (Sunday=0)
+│ │ │ │ │
+│ │ │ │ │
+* * * * *
+```
+
+### Examples
+
+| Expression | Description |
+|------------|-------------|
+| `0 9 * * 1-5` | Weekdays at 9:00 AM |
+| `30 14 * * *` | Every day at 2:30 PM |
+| `0 */2 * * *` | Every 2 hours |
+| `0 0 1 * *` | First day of every month at midnight |
+| `0 9 * * 1` | Every Monday at 9:00 AM |
+| `*/15 * * * *` | Every 15 minutes |
+
+### Special Characters
+
+- `*` — Any value
+- `*/n` — Every n units
+- `n-m` — Range from n to m
+- `n,m` — Values n and m
+
+### Timezone Support
+
+Jobs are scheduled in the specified timezone. If no timezone is provided, the system default is used.
+
+```json
+{
+  "cron_expr": "0 9 * * *",
+  "tz": "America/Los_Angeles"  // Runs at 9 AM Pacific Time
+}
+```

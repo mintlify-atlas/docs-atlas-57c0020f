@@ -1,0 +1,284 @@
+---
+title: Telegram Bot Setup
+description: Connect Asta to Telegram for mobile AI access with voice transcription and exec approvals
+---
+
+# Telegram Bot Setup
+
+Asta includes a full-featured Telegram bot that shares context with the desktop app and web panel. Send messages, voice notes, and manage exec command approvals—all from Telegram.
+
+## Features
+
+- **Unified context** — Same chat history as desktop/web
+- **Voice transcription** — Send voice messages or audio files for meeting notes
+- **Exec approvals** — Approve/deny shell commands with inline buttons
+- **Provider switching** — Change AI provider and model via `/provider` command
+- **Audio URL support** — Paste direct audio links (up to 50 MB) for long recordings
+
+<Steps>
+  <Step title="Create a bot with BotFather">
+    1. Open Telegram and search for **@BotFather**
+    2. Start a chat and send `/newbot`
+    3. Follow prompts to choose a name and username
+    4. **Save the token** BotFather provides (looks like `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+    <Note>
+      Keep your bot token secret. Anyone with the token can control your bot.
+    </Note>
+  </Step>
+
+  <Step title="Configure Asta with the bot token">
+    **Option 1: Web Settings**
+    1. Open Asta's web panel at `http://localhost:8000`
+    2. Go to **Settings → Telegram**
+    3. Paste your bot token
+    4. Click **Save**
+
+    **Option 2: Environment variable**
+    Add to `.env` in `~/workspace/source/backend/`:
+
+    ```bash
+    TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+    ```
+
+    Restart Asta after saving.
+  </Step>
+
+  <Step title="Restrict access (recommended)">
+    By default, anyone can message your bot. To restrict access:
+
+    **Find your Telegram user ID:**
+    1. Message your bot: `/start`
+    2. Check Asta logs for your user ID (9-10 digits)
+
+    Or use [@userinfobot](https://t.me/userinfobot) to get your ID.
+
+    **Set allowlist in Settings or .env:**
+    ```bash
+    TELEGRAM_ALLOWED_IDS=123456789,987654321
+    ```
+
+    Comma-separated list of numeric user IDs.
+
+    <Warning>
+      Without an allowlist, **anyone** who finds your bot can send messages and execute commands.
+    </Warning>
+  </Step>
+
+  <Step title="Test the bot">
+    1. Search for your bot in Telegram (use the username you chose)
+    2. Send `/start`
+    3. Ask a question: `What's the weather in Tokyo?`
+
+    If configured correctly, Asta will respond using your default AI provider.
+  </Step>
+</Steps>
+
+## Bot Commands
+
+All commands work in any chat with your bot:
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Show welcome message and command list |
+| `/provider` | Switch AI provider (Claude, Google, OpenAI, Groq, OpenRouter, Ollama) |
+| `/model` | Show current provider and model |
+| `/think` | Set thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`) |
+| `/reasoning` | Toggle reasoning visibility (`off`, `on`, `stream`) |
+| `/exec_mode` | Change exec security mode (`deny`, `allowlist`, `full`) |
+| `/allow <binary>` | Add a binary to exec allowlist (e.g., `/allow rg`) |
+| `/allowlist` | Show current exec allowlist and mode |
+| `/approvals` | List pending exec approvals |
+
+### Example: Switching Providers
+
+```
+/provider
+```
+
+Tap a provider button (e.g., **Claude**) to switch. Asta will use that provider for all subsequent messages.
+
+### Example: Allowing a Command
+
+```
+/allow rg
+```
+
+Adds `rg` (ripgrep) to the exec allowlist. Asta can now run `rg` commands when `exec_mode` is `allowlist`.
+
+## Voice Messages & Audio Files
+
+Send voice messages or audio files to Asta for automatic transcription and formatting:
+
+1. **Record a voice message** in Telegram (hold the mic button)
+2. Or **attach an audio file** (up to 20 MB via Telegram, 50 MB via URL)
+3. Optionally **add a caption** like `meeting notes` or `action items`
+4. Asta transcribes and formats the content
+
+### Audio URL Workaround (for files >20 MB)
+
+Telegram limits file downloads to 20 MB. For longer recordings:
+
+1. Upload to a file host (Google Drive, Dropbox, etc.)
+2. Get a **direct download link** (must end in `.mp3`, `.m4a`, `.wav`, etc.)
+3. Send the link to your bot:
+
+```
+https://example.com/meeting.m4a
+meeting notes
+```
+
+Asta fetches and processes files up to 50 MB.
+
+<Note>
+  Asta uses faster-whisper for transcription. First transcription may take 10-30 seconds while the model loads.
+</Note>
+
+## Exec Command Approval Flow
+
+When Asta wants to run a command (in `allowlist` mode) that requires approval, Telegram shows inline buttons:
+
+<Steps>
+  <Step title="User asks a question that requires a command">
+    ```
+    What notes do I have about banking?
+    ```
+  </Step>
+
+  <Step title="Asta requests approval">
+    Telegram message:
+    ```
+    This action is blocked pending exec approval. Tap Once, Always, or Deny below.
+
+    1. app_abc123
+    Binary: memo
+    Command: `memo notes -s "bank"`
+    ```
+
+    **Inline buttons:** ✅ Once | ✅ Always | ❌ Deny
+  </Step>
+
+  <Step title="User taps a button">
+    - **Once:** Runs the command this time only
+    - **Always:** Adds the binary to the allowlist and runs the command
+    - **Deny:** Blocks the command
+  </Step>
+
+  <Step title="Asta resumes with result">
+    After approval, Asta automatically continues the conversation with the command output.
+  </Step>
+</Steps>
+
+### Viewing Pending Approvals
+
+```
+/approvals
+```
+
+Lists all pending exec approvals for your chat. Tap buttons to approve or deny.
+
+## Configuration Reference
+
+### Environment Variables
+
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+
+# Optional: Restrict access
+TELEGRAM_ALLOWED_IDS=123456789,987654321
+
+# Optional: Custom API endpoint (for self-hosted Telegram)
+TELEGRAM_API_BASE=https://api.telegram.org
+```
+
+### Settings Panel
+
+In **Settings → Telegram**:
+
+- **Bot Token:** Your BotFather token
+- **Allowed User IDs:** Comma-separated numeric IDs
+- **Enable Bot:** Toggle to start/stop the bot
+
+Changes take effect after backend restart.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot doesn't respond">
+    **Check bot token:**
+    - Ensure `TELEGRAM_BOT_TOKEN` is set in `.env` or Settings
+    - Verify the token is correct (no extra spaces)
+
+    **Check backend logs:**
+    ```bash
+    cd ~/workspace/source/backend
+    tail -f asta.log | grep -i telegram
+    ```
+
+    **Restart backend:**
+    ```bash
+    ./asta.sh restart
+    ```
+  </Accordion>
+
+  <Accordion title="'You're not authorized to use this bot'">
+    Your Telegram user ID is not in the allowlist.
+
+    1. Check your user ID with [@userinfobot](https://t.me/userinfobot)
+    2. Add your ID to `TELEGRAM_ALLOWED_IDS` in `.env` or Settings
+    3. Restart Asta backend
+  </Accordion>
+
+  <Accordion title="Voice transcription fails">
+    **Check faster-whisper:**
+    ```bash
+    pip show faster-whisper
+    ```
+
+    If not installed:
+    ```bash
+    pip install faster-whisper
+    ```
+
+    **First transcription is slow:** The whisper model downloads on first use (~75 MB). Subsequent transcriptions are faster.
+  </Accordion>
+
+  <Accordion title="Exec approvals not showing">
+    Ensure:
+    1. Exec mode is `allowlist`: `/exec_mode`
+    2. The command binary is not in the allowlist: `/allowlist`
+    3. You're in the same chat where the original request was made
+
+    Pending approvals expire after 1 hour.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **Security:** Exec approval buttons run commands with your permissions. Only approve commands you understand. Use `deny` mode if you don't want Asta to execute any shell commands.
+</Warning>
+
+## Advanced: Custom Commands
+
+Source: `~/workspace/source/backend/app/channels/telegram_bot.py`
+
+You can add custom Telegram commands by editing the bot handler:
+
+```python
+# Add to telegram_bot.py
+async def custom_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    await update.message.reply_text("Custom command response")
+
+# Register in start_telegram_bot()
+application.add_handler(CommandHandler("custom", custom_cmd))
+```
+
+Restart the backend to apply changes.
+
+## Next Steps
+
+- [Exec Tool Security](/guides/exec-tool) - Understand command execution modes
+- [Creating Skills](/guides/creating-skills) - Build custom workspace skills
+- [Subagent Orchestration](/guides/subagents) - Run background tasks

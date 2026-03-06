@@ -1,0 +1,306 @@
+---
+title: Common Errors
+description: Quick reference for errors you might encounter and how to fix them
+---
+
+This page documents common errors you may encounter when running Asta and their solutions.
+
+<Note>
+For comprehensive error documentation, see `docs/ERRORS.md` in the source repository.
+</Note>
+
+## Startup & Installation
+
+<AccordionGroup>
+<Accordion title="Virtualenv missing" icon="circle-exclamation">
+**Error:** No `.venv` directory found in `backend/`
+
+**Solution:**
+```bash
+cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+```
+
+Or use the built-in setup command:
+```bash
+./asta.sh setup
+```
+</Accordion>
+
+<Accordion title="ModuleNotFoundError / No module named 'X'" icon="circle-exclamation">
+**Error:** Python dependency not installed
+
+**Solution:**
+```bash
+cd backend && source .venv/bin/activate && pip install -r requirements.txt
+```
+</Accordion>
+
+<Accordion title="Port 8010 already in use" icon="circle-exclamation">
+**Error:** Another process is using the backend port
+
+**Solution:**
+Restart Asta to free and restart the port:
+```bash
+./asta.sh restart
+```
+
+Alternatively, set a different port in your environment:
+```bash
+export ASTA_API_URL=http://localhost:8011
+```
+</Accordion>
+
+<Accordion title="Directory not found: backend" icon="circle-exclamation">
+**Error:** Running commands from the wrong directory
+
+**Solution:**
+Always run `asta.sh` commands from the `asta/` repository root directory.
+</Accordion>
+</AccordionGroup>
+
+## Python Version Issues
+
+<Accordion title="Python 3.14 not supported" icon="triangle-exclamation">
+**Problem:** Asta requires Python 3.12 or 3.13. Python 3.14 is not yet supported due to ChromaDB and pydantic compatibility issues.
+
+**Solution:**
+Install a compatible Python version:
+```bash
+# macOS
+brew install python@3.12
+
+# Then setup the backend
+cd backend
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+The `asta.sh` script automatically prefers Python 3.12 or 3.13 and will skip 3.14+ versions.
+</Accordion>
+
+## API & Connection
+
+<AccordionGroup>
+<Accordion title="API off / Cannot reach Asta API" icon="wifi-slash">
+**Error:** Backend is not running
+
+**Solution:**
+```bash
+./asta.sh start
+```
+
+Or run uvicorn manually:
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8010
+```
+</Accordion>
+
+<Accordion title="CORS error" icon="circle-exclamation">
+**Error:** Request origin not allowed
+
+**Solution:**
+Add your origin to `ASTA_CORS_ORIGINS` in `backend/.env` (comma-separated):
+```bash
+ASTA_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+Restart the backend after making changes:
+```bash
+./asta.sh restart
+```
+</Accordion>
+</AccordionGroup>
+
+## Database & Persistence
+
+<AccordionGroup>
+<Accordion title="SQLite lock errors" icon="database">
+**Error:** Database is locked or corrupt
+
+**Symptoms:**
+- `database is locked` errors
+- `ResourceWarning: Connection deleted before being closed`
+- Unable to save data
+
+**Solutions:**
+
+1. **Restart Asta to release locks:**
+```bash
+./asta.sh restart
+```
+
+2. **Check file permissions:**
+```bash
+ls -la backend/asta.db
+```
+Ensure the file is writable by your user.
+
+3. **Release stale lock holders:**
+The `asta.sh restart` command automatically attempts to release stale processes holding SQLite locks.
+
+4. **Start fresh (last resort):**
+If the database is corrupt, back it up and remove it:
+```bash
+cp backend/asta.db backend/asta.db.backup
+rm backend/asta.db
+./asta.sh start
+```
+
+<Warning>
+Removing `asta.db` will delete all your conversation history, reminders, and settings. Only do this as a last resort.
+</Warning>
+</Accordion>
+
+<Accordion title="USER.md not found / empty" icon="file">
+**Error:** Workspace context file not created
+
+**Solution:**
+Create or use the existing `workspace/USER.md` file:
+```bash
+mkdir -p workspace
+cat > workspace/USER.md << 'EOF'
+# About you
+
+- **Preferred name:** 
+- **Location:** 
+- **Timezone:** 
+- **Important:** 
+  - 
+EOF
+```
+
+Or use the doc command with auto-fix:
+```bash
+./asta.sh doc --fix
+```
+</Accordion>
+</AccordionGroup>
+
+## AI Providers
+
+<AccordionGroup>
+<Accordion title="No AI provider found" icon="robot">
+**Error:** No API key configured
+
+**Solution:**
+Add at least one AI provider API key in Settings → API keys:
+- Groq
+- Gemini
+- Claude (Anthropic)
+- OpenAI
+- OpenRouter
+- Or run Ollama locally
+
+```bash
+# For Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+```
+</Accordion>
+
+<Accordion title="Invalid or expired API key" icon="key">
+**Error:** API key is wrong or expired
+
+**Solution:**
+1. Update the key in Settings → API keys
+2. Or update `backend/.env` directly
+3. Restart the backend:
+```bash
+./asta.sh restart
+```
+</Accordion>
+
+<Accordion title="Client error 404 for Ollama" icon="server">
+**Error:** Ollama not running or wrong URL
+
+**Solution:**
+1. Start Ollama:
+```bash
+ollama serve
+```
+
+2. If Ollama is on another host, set the correct URL in `backend/.env`:
+```bash
+OLLAMA_BASE_URL=http://your-ollama-host:11434
+```
+
+3. Restart the backend:
+```bash
+./asta.sh restart
+```
+</Accordion>
+</AccordionGroup>
+
+## Learning / RAG
+
+<AccordionGroup>
+<Accordion title="RAG not available / Ollama not available" icon="brain">
+**Error:** RAG uses Ollama for embeddings; Ollama is not running or the model is missing
+
+**Solution:**
+1. Install Ollama:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+2. Pull the embedding model:
+```bash
+ollama pull nomic-embed-text
+```
+
+3. If Ollama is on another host, set `OLLAMA_BASE_URL` in `backend/.env`
+
+4. Refresh the Learning page in Asta
+</Accordion>
+
+<Accordion title="RAG store failed" icon="database">
+**Error:** ChromaDB or FTS DB could not be created
+
+**Solution:**
+1. Check disk space:
+```bash
+df -h
+```
+
+2. Check write permissions:
+```bash
+ls -la backend/chroma_db backend/rag_fts.db
+```
+
+3. Set custom paths in `backend/.env` if needed:
+```bash
+ASTA_CHROMA_PATH=/custom/path/chroma_db
+ASTA_FTS_PATH=/custom/path/rag_fts.db
+```
+</Accordion>
+</AccordionGroup>
+
+## Logs & Debugging
+
+**Backend logs location:**
+```bash
+# Main log file (relative to repo root)
+backend.log
+
+# Or explicitly:
+./backend/backend.log
+```
+
+**View recent logs:**
+```bash
+tail -f backend.log
+```
+
+**API documentation:**
+Access the interactive API docs when the backend is running:
+```
+http://localhost:8010/docs
+```
+
+## See Also
+
+- [Diagnostics](/troubleshooting/diagnostics) - Run system diagnostics and health checks
+- [Source ERRORS.md](https://github.com/yourusername/asta/blob/main/docs/ERRORS.md) - Complete error reference

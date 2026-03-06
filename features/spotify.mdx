@@ -1,0 +1,552 @@
+---
+title: "Spotify Integration"
+description: "Control Spotify playback, search music, and manage playlists with natural language commands"
+---
+
+Asta integrates with Spotify to let you control playback, search for music, and manage playlists using natural language. The integration supports both searching (via Client Credentials) and playback control (via OAuth).
+
+## Setup
+
+To use Spotify features, you need to create a Spotify application and configure your credentials.
+
+<Steps>
+  <Step title="Create a Spotify App">
+    Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create a new application:
+    
+    1. Click **Create App**
+    2. Fill in app name and description
+    3. Add redirect URI: `http://localhost:8080/api/spotify/callback`
+    4. Note your **Client ID** and **Client Secret**
+  </Step>
+
+  <Step title="Configure credentials">
+    Add your Spotify credentials to Asta's settings:
+    
+    ```bash
+    # Option 1: Environment variables
+    export SPOTIFY_CLIENT_ID="your_client_id"
+    export SPOTIFY_CLIENT_SECRET="your_client_secret"
+    ```
+    
+    Or configure via the Settings UI in the Asta web interface.
+  </Step>
+
+  <Step title="Connect your account (for playback)">
+    To control playback, you need to authorize Asta:
+    
+    1. Go to **Settings** > **Spotify** in the web interface
+    2. Click **Connect Spotify**
+    3. Authorize Asta to access your Spotify account
+    4. You'll be redirected back with a success message
+  </Step>
+</Steps>
+
+## OAuth Flow
+
+The OAuth connection flow allows Asta to control your Spotify playback.
+
+### Authorization URL
+
+```
+GET /api/spotify/auth?user_id=YOUR_USER_ID
+```
+
+Redirects to Spotify's authorization page with these scopes:
+
+- `user-read-playback-state` - Read current playback
+- `user-modify-playback-state` - Control playback
+- `user-read-currently-playing` - Get current track
+- `playlist-read-private` - Access private playlists
+- `playlist-read-collaborative` - Access collaborative playlists
+
+### Callback Handling
+
+After authorization, Spotify redirects to:
+
+```
+GET /api/spotify/callback?code=AUTH_CODE&state=USER_ID
+```
+
+Asta exchanges the code for access and refresh tokens, which are stored securely in the database.
+
+### Token Refresh
+
+Access tokens expire after 1 hour. Asta automatically refreshes them:
+
+```python
+# Automatic refresh when token expires
+token = await get_user_access_token(user_id)
+# Returns valid token or None if refresh fails
+```
+
+<Note>
+  If the refresh token is revoked (e.g., user disconnects via Spotify settings), Asta will detect the `invalid_grant` error and clear stored tokens, requiring re-authorization.
+</Note>
+
+## Searching Music
+
+Search for tracks, artists, and playlists using natural language.
+
+### Track Search
+
+```
+search spotify for bohemian rhapsody
+find song yesterday beatles
+find track stairway to heaven
+```
+
+Asta returns up to 5 results with:
+- Track name
+- Artist(s)
+- Spotify URL
+- Track URI (for playback)
+
+### Artist Search
+
+```
+find artist radiohead
+search spotify for taylor swift
+```
+
+### Playlist Search
+
+```
+search for workout playlists
+find playlist chill vibes
+```
+
+<CodeGroup>
+```python Search tracks
+from app.spotify_client import spotify_search_if_configured
+
+# Search for tracks
+results = await spotify_search_if_configured("bohemian rhapsody")
+
+# Returns:
+# [
+#   {
+#     "name": "Bohemian Rhapsody",
+#     "artist": "Queen",
+#     "url": "https://open.spotify.com/track/...",
+#     "uri": "spotify:track:..."
+#   },
+#   ...
+# ]
+```
+
+```python Search artists
+from app.spotify_client import search_spotify_artists
+
+# Get access token first
+token = await get_spotify_token(client_id, client_secret)
+
+# Search artists
+artists = await search_spotify_artists("radiohead", token, max_results=3)
+
+# Returns:
+# [
+#   {
+#     "name": "Radiohead",
+#     "uri": "spotify:artist:..."
+#   }
+# ]
+```
+</CodeGroup>
+
+## Playback Control
+
+Control Spotify playback across your devices using natural language.
+
+### Play Music
+
+```
+play bohemian rhapsody on spotify
+play radiohead
+play my playlist workout
+play the song yesterday
+```
+
+Asta will:
+1. Search for the track/artist/playlist
+2. Detect available Spotify devices
+3. Prompt for device selection (if multiple devices)
+4. Start playback
+
+### Device Selection
+
+When multiple devices are available:
+
+```
+You: play bohemian rhapsody
+Asta: Which device?
+      1. iPhone
+      2. MacBook Pro
+      3. Living Room Speaker
+
+You: 2
+Asta: Playing Bohemian Rhapsody by Queen on MacBook Pro.
+```
+
+You can respond with:
+- Device number (e.g., `2`)
+- Device name (e.g., `MacBook Pro`)
+- Partial name (e.g., `macbook`)
+
+### Playback Commands
+
+```
+skip
+next song
+what's playing?
+now playing
+currently playing
+volume 50
+set volume to 30%
+turn it up
+```
+
+<CodeGroup>
+```python List devices
+from app.spotify_client import list_user_devices
+
+devices = await list_user_devices(user_id)
+
+# Returns:
+# [
+#   {
+#     "id": "device_id_123",
+#     "name": "MacBook Pro",
+#     "type": "Computer",
+#     "is_active": True
+#   },
+#   ...
+# ]
+```
+
+```python Start playback
+from app.spotify_client import start_playback
+
+# Play a specific track
+await start_playback(
+    user_id="user123",
+    device_id="device_id_123",
+    track_uri="spotify:track:..."
+)
+
+# Play a playlist or album (context)
+await start_playback(
+    user_id="user123",
+    device_id="device_id_123",
+    context_uri="spotify:playlist:..."
+)
+```
+
+```python Control playback
+from app.spotify_client import (
+    skip_next_track,
+    set_volume_percent,
+    get_currently_playing
+)
+
+# Skip to next track
+await skip_next_track(user_id)
+
+# Set volume to 50%
+await set_volume_percent(user_id, 50)
+
+# Get current track
+now = await get_currently_playing(user_id)
+# Returns:
+# {
+#   "is_playing": True,
+#   "track": "Bohemian Rhapsody",
+#   "artist": "Queen",
+#   "album": "A Night at the Opera"
+# }
+```
+</CodeGroup>
+
+## Playlists
+
+Manage and play your Spotify playlists.
+
+### List Your Playlists
+
+```python
+from app.spotify_client import list_user_playlists
+
+playlists = await list_user_playlists(user_id, max_results=50)
+
+# Returns:
+# [
+#   {
+#     "name": "Workout Mix",
+#     "uri": "spotify:playlist:...",
+#     "owner": "your_username",
+#     "tracks_total": 42
+#   },
+#   ...
+# ]
+```
+
+### Play Playlist
+
+```
+play my playlist workout
+play playlist chill vibes
+```
+
+Asta searches your playlists using fuzzy matching:
+
+```python
+from app.spotify_client import find_playlist_uri_by_name
+
+playlist_uri, matched_name = find_playlist_uri_by_name(
+    "workout",
+    playlists
+)
+# Returns URI if match found (exact or substring)
+```
+
+### Play Playlist by URI
+
+You can also paste a Spotify playlist link:
+
+```
+play https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+play spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
+```
+
+### Create Playlist
+
+```python
+from app.spotify_client import create_playlist, add_tracks_to_playlist
+
+# Create a new playlist
+playlist = await create_playlist(
+    user_id="user123",
+    name="My AI Playlist",
+    public=False,
+    description="Created by Asta"
+)
+
+# Add tracks to the playlist
+await add_tracks_to_playlist(
+    user_id="user123",
+    playlist_id=playlist["id"],
+    track_uris=[
+        "spotify:track:...",
+        "spotify:track:...",
+    ]
+)
+```
+
+## Advanced Features
+
+The Spotify service includes enhanced features for better playback experience.
+
+### Intent-Based Routing
+
+The service uses pattern matching to detect user intent:
+
+```python
+# Intent patterns
+- "control": pause, resume, skip, shuffle, repeat
+- "playlist": play my playlist X
+- "track": play song/artist X
+- "search": search spotify for X
+```
+
+### Retry Mechanism
+
+If playback fails (e.g., no active device), Asta stores a retry request:
+
+```
+You: play bohemian rhapsody
+Asta: No active Spotify devices found. Open Spotify first.
+
+[You open Spotify on your phone]
+
+You: done
+Asta: Which device?
+      1. iPhone
+      ...
+```
+
+Retry requests expire after 5 minutes.
+
+### Album Context Playback
+
+When playing a track, Asta can play it in album context:
+
+```python
+# Instead of playing single track
+await start_playback(user_id, device_id, track_uri="...")
+
+# Play track in album context
+await start_playback(
+    user_id,
+    device_id,
+    context_uri="spotify:album:...",
+    offset={"uri": "spotify:track:..."}  # Start at this track
+)
+```
+
+This enables seamless album playback after the requested track.
+
+## Implementation Files
+
+The Spotify integration is split across multiple files:
+
+### `backend/app/spotify_client.py`
+
+Core Spotify API client:
+- Token management (Client Credentials & OAuth)
+- Search (tracks, artists, playlists)
+- Playback control (play, pause, skip, volume)
+- Device management
+- Current playback status
+
+### `backend/app/services/spotify_service.py`
+
+High-level service layer:
+- Natural language intent parsing
+- Device selection flow
+- Retry mechanism
+- Enhanced playlist matching
+- Album context playback
+- Recommendations queueing
+
+## Configuration Options
+
+```python
+# Environment variables
+SPOTIFY_CLIENT_ID="your_client_id"
+SPOTIFY_CLIENT_SECRET="your_client_secret"
+
+# Service settings (in spotify_service.py)
+CACHE_TTL_SECONDS = 10 * 60  # Cache playlists for 10 min
+PLAYLIST_MATCH_THRESHOLD = 80  # Minimum similarity score
+RECOMMENDATIONS_TO_QUEUE = 12  # Tracks to queue after playing
+PREFER_ALBUM_CONTEXT_FOR_TRACKS = True  # Play in album context
+ENABLE_ENHANCED_INTENTS_BY_DEFAULT = False  # Opt-in for new features
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Keep Spotify app open">
+    For playback control to work, you need at least one active Spotify device:
+    - Open Spotify on your phone, computer, or speaker
+    - Asta will detect available devices automatically
+  </Step>
+
+  <Step title="Use specific commands">
+    More specific commands work better:
+    - ✅ `play bohemian rhapsody by queen`
+    - ✅ `play my playlist workout`
+    - ❌ `play music` (too vague)
+  </Step>
+
+  <Step title="Reconnect if needed">
+    If Asta says "I need to reconnect to Spotify":
+    - Go to Settings > Spotify
+    - Click Disconnect, then Connect again
+    - This refreshes the OAuth tokens
+  </Step>
+
+  <Step title="Name playlists clearly">
+    Use descriptive playlist names for better matching:
+    - ✅ `Workout Mix 2024`
+    - ✅ `Chill Vibes`
+    - ❌ `Playlist 1` (generic)
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Connection Issues
+
+**Error**: `Spotify is not connected`
+
+**Solution**: Go to Settings > Spotify and click "Connect Spotify"
+
+---
+
+**Error**: `I need to reconnect to Spotify`
+
+**Solution**: Your refresh token expired. Disconnect and reconnect in Settings.
+
+---
+
+**Error**: `Token expired. Please reconnect in Settings.`
+
+**Solution**: OAuth tokens are invalid. Reconnect your Spotify account.
+
+### Playback Issues
+
+**Error**: `No active Spotify devices found`
+
+**Solution**:
+- Open Spotify on any device (phone, computer, speaker)
+- Play something briefly to activate the device
+- Try your command again, or say "done" to retry
+
+---
+
+**Error**: `Failed to play`
+
+**Solution**:
+- Check if the device is still active
+- Verify Spotify Premium (free accounts have limited API access)
+- Check device volume and connectivity
+
+### Search Issues
+
+**Error**: `I couldn't find 'X' on Spotify`
+
+**Solution**:
+- Check spelling of track/artist name
+- Try a different query (e.g., include artist name)
+- Verify the content exists on Spotify
+
+### Playlist Issues
+
+**Error**: `I couldn't find playlist 'X'`
+
+**Solution**:
+- List your playlists to see exact names
+- Use the full playlist name or paste the Spotify link
+- Check that the playlist is in your library (not just followed)
+
+## API Reference
+
+Key endpoints and functions:
+
+```python
+# Token management
+get_spotify_token(client_id, client_secret) -> str | None
+get_user_access_token(user_id) -> str | None
+
+# Search
+search_spotify_tracks(query, access_token, max_results=5) -> list[dict]
+search_spotify_artists(query, access_token, max_results=3) -> list[dict]
+search_playlists_global(query, token) -> list[dict]
+
+# Playback
+start_playback(user_id, device_id, track_uri?, context_uri?) -> bool
+skip_next_track(user_id) -> bool
+set_volume_percent(user_id, volume) -> bool
+
+# Device management
+list_user_devices(user_id) -> list[dict]
+ensure_active_device(token, user_id) -> str | None
+
+# Playlists
+list_user_playlists(user_id, max_results=50) -> list[dict]
+create_playlist(user_id, name, public=False, description="") -> dict | None
+add_tracks_to_playlist(user_id, playlist_id, track_uris) -> bool
+
+# Current playback
+get_currently_playing(user_id) -> dict | None
+```

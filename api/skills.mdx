@@ -1,0 +1,216 @@
+---
+title: 'Skills'
+description: 'Manage AI skills and capabilities'
+---
+
+## Get Skills
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/settings/skills \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "skills": [
+    {
+      "id": "files",
+      "name": "Files",
+      "description": "Local file access and summaries",
+      "enabled": true,
+      "available": true,
+      "source": "builtin",
+      "is_agent": false
+    },
+    {
+      "id": "google_search",
+      "name": "Google search",
+      "description": "Search the web for current information",
+      "enabled": true,
+      "available": true,
+      "source": "builtin",
+      "is_agent": false
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "description": "Search songs on Spotify",
+      "enabled": true,
+      "available": true,
+      "source": "builtin",
+      "is_agent": false,
+      "action_hint": "Connect"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Manage repos, issues, pull requests",
+      "enabled": true,
+      "available": true,
+      "source": "builtin",
+      "is_agent": false,
+      "required_bins": ["gh"],
+      "install_cmd": "brew install gh",
+      "install_label": "Install GitHub CLI"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+<ResponseField name="skills" type="array">
+  List of available skills
+  <Expandable title="properties">
+    <ResponseField name="id" type="string">
+      Unique skill identifier
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Display name of the skill
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      What the skill does
+    </ResponseField>
+    <ResponseField name="enabled" type="boolean">
+      Whether the skill is enabled for the AI
+    </ResponseField>
+    <ResponseField name="available" type="boolean">
+      Whether the skill can be used (dependencies met)
+    </ResponseField>
+    <ResponseField name="source" type="string">
+      `builtin` or `workspace`
+    </ResponseField>
+    <ResponseField name="is_agent" type="boolean">
+      Whether this is an agent skill (can run autonomously)
+    </ResponseField>
+    <ResponseField name="action_hint" type="string" optional>
+      Hint for what to do if skill is unavailable
+    </ResponseField>
+    <ResponseField name="required_bins" type="array" optional>
+      Required command-line tools
+    </ResponseField>
+    <ResponseField name="install_cmd" type="string" optional>
+      Command to install dependencies
+    </ResponseField>
+    <ResponseField name="install_label" type="string" optional>
+      Label for install button
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Toggle Skill
+
+<RequestExample>
+```bash
+curl -X PUT https://api.asta.app/api/settings/skills \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skill_id": "spotify",
+    "enabled": true
+  }'
+```
+</RequestExample>
+
+<ParamField body="skill_id" type="string" required>
+  Skill identifier to toggle
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Enable or disable the skill
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "skill_id": "spotify",
+  "enabled": true
+}
+```
+</ResponseExample>
+
+<ResponseField name="skill_id" type="string">
+  The skill that was toggled
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  New enabled state
+</ResponseField>
+
+---
+
+## Built-in Skills
+
+Asta includes the following built-in skills:
+
+### Core Skills
+
+- **Files** - Local file access and summaries
+- **RAG** - Learning and document knowledge
+- **Time** - Current time with timezone support
+- **Weather** - Current weather and forecasts
+
+### Search & Information
+
+- **Google Search** - Web search for current information
+- **Lyrics** - Find song lyrics
+
+### Integrations
+
+- **Spotify** - Search and play music
+- **GitHub** - Manage repos, issues, and PRs (requires `gh` CLI)
+- **Vercel** - Check deployments and projects (requires `vercel` CLI)
+- **Google Workspace** - Gmail, Calendar, Drive, Contacts (requires `gog` CLI)
+
+### Productivity
+
+- **Reminders** - Wake-up calls and scheduled reminders
+- **Audio Notes** - Transcribe and format meeting recordings
+- **Self Awareness** - Answer questions about Asta itself
+- **Server Status** - Monitor system metrics
+
+### Fun
+
+- **Silly GIF** - Reply with relevant GIFs (requires Giphy API key)
+
+---
+
+## Upload Skill Package
+
+<RequestExample>
+```bash
+curl -X POST https://api.asta.app/api/skills/upload \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -F "file=@my-skill.zip"
+```
+</RequestExample>
+
+<ParamField body="file" type="file" required>
+  Zip file containing skill with SKILL.md at root or in single top-level folder
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "skill_id": "my-custom-skill",
+  "ok": true
+}
+```
+</ResponseExample>
+
+<ResponseField name="skill_id" type="string">
+  ID of the uploaded skill
+</ResponseField>
+
+<ResponseField name="ok" type="boolean">
+  Whether upload was successful
+</ResponseField>
+
+<Note>
+Skill packages must follow the OpenClaw format with a SKILL.md file at the root.
+Max file size: 20 MB.
+</Note>

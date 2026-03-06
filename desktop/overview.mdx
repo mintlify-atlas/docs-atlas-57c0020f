@@ -1,0 +1,171 @@
+---
+title: "Desktop App Overview"
+description: "Asta's native desktop application built with Tauri v2, React, and TypeScript"
+---
+
+The Asta desktop app is a native application built with **Tauri v2**, **React 19**, and **TypeScript**. It provides a fast, lightweight interface for interacting with your AI workspace through a system tray application with global keyboard shortcuts.
+
+## Technology Stack
+
+<Card title="Core Technologies" icon="code">
+  - **Frontend**: React 19 + TypeScript + Vite
+  - **Desktop Framework**: Tauri v2 (Rust)
+  - **Styling**: TailwindCSS with custom design system
+  - **Markdown**: react-markdown with syntax highlighting
+</Card>
+
+## Key Features
+
+### Global Shortcut Access
+
+The app registers **Alt+Space** (Option+Space on macOS) as a global shortcut to instantly show/hide the window from anywhere on your system. This allows quick access to Asta without switching contexts.
+
+### System Tray Integration
+
+<Card title="Tray Behavior" icon="window-maximize">
+  - **Left click** - Show and focus the app window
+  - **Right click** - Open context menu (Open/Quit)
+  - **Close button** - Hides to tray instead of quitting
+</Card>
+
+The app lives in your system tray and continues running in the background, ready to appear instantly when needed.
+
+### Multi-User Authentication
+
+The app supports both single-user and multi-user modes:
+
+- **Single-user mode**: No login required, direct access to the workspace
+- **Multi-user mode**: JWT-based authentication with role management (admin/user)
+- Automatic auth validation and token refresh
+
+### Setup Wizard
+
+First-time users are guided through a setup wizard to configure:
+
+- AI provider selection (Claude, Gemini, OpenRouter, Ollama)
+- API key configuration
+- Backend connection settings
+- Optional Tailscale integration for remote access
+
+## Application Structure
+
+### Directory Layout
+
+The source code is located in `MACWinApp/asta-app/` with the following structure:
+
+```
+asta-app/
+├── src/                    # React frontend
+│   ├── App.tsx            # Main application component
+│   ├── components/        # UI components
+│   │   ├── Chat/         # Chat interface
+│   │   ├── Sidebar/      # Navigation sidebar
+│   │   ├── Settings/     # Settings panel
+│   │   ├── Agents/       # Agent management
+│   │   ├── Setup/        # Setup wizard
+│   │   └── Login/        # Authentication
+│   └── lib/              # Utilities
+│       ├── api.ts        # Backend API client
+│       ├── auth.ts       # Authentication helpers
+│       ├── store.ts      # LocalStorage wrapper
+│       └── types.ts      # TypeScript types
+├── src-tauri/             # Rust backend
+│   ├── src/
+│   │   └── lib.rs        # Main Tauri application
+│   ├── Cargo.toml        # Rust dependencies
+│   └── tauri.conf.json   # Tauri configuration
+├── package.json           # Node dependencies
+└── vite.config.ts        # Vite build config
+```
+
+### Main Views
+
+<CardGroup cols={2}>
+  <Card title="Chat View" icon="message">
+    The primary interface for conversing with AI agents. Supports streaming responses, markdown rendering, code syntax highlighting, and conversation history.
+  </Card>
+  
+  <Card title="Sidebar" icon="sidebar">
+    Shows conversation history, new chat button, agent picker, settings access, and online/offline status indicator.
+  </Card>
+  
+  <Card title="Settings Sheet" icon="gear">
+    Configure AI providers, API keys, backend URL, Tailscale integration, autostart preferences, and theme options.
+  </Card>
+  
+  <Card title="Agents Sheet" icon="robot">
+    Browse and enable specialized AI agents. Filter by category, toggle agent availability, and customize agent models.
+  </Card>
+</CardGroup>
+
+## Tauri Plugins
+
+The app uses several Tauri v2 plugins for native functionality:
+
+- **`tauri-plugin-global-shortcut`** - Register Alt+Space system-wide
+- **`tauri-plugin-autostart`** - Launch on system boot
+- **`tauri-plugin-http`** - Backend API communication
+- **`tauri-plugin-opener`** - Open URLs in default browser
+
+## Backend Communication
+
+The desktop app connects to the Asta backend server (default: `http://localhost:8010`) via REST API:
+
+```typescript
+// lib/api.ts handles all backend communication
+const BACKEND_URL = "http://localhost:8010";
+
+// Key endpoints:
+- /api/chat          # Streaming chat responses
+- /api/conversations        # Conversation management
+- /api/agents               # List available agents
+- /api/settings             # Configuration
+- /api/auth/login           # Authentication
+```
+
+See the [API Reference](/api/chat) for complete endpoint documentation.
+
+## Window Configuration
+
+The main window is configured in `src-tauri/tauri.conf.json`:
+
+```json
+{
+  "title": "Asta",
+  "width": 1100,
+  "height": 780,
+  "minWidth": 720,
+  "minHeight": 480,
+  "visible": false,        // Hidden on launch (shown in setup)
+  "center": true,
+  "dragDropEnabled": false
+}
+```
+
+## Platform Support
+
+<CardGroup cols={2}>
+  <Card title="macOS" icon="apple">
+    - macOS 11+ (Big Sur and later)
+    - Native Apple Silicon (aarch64) and Intel (x86_64) builds
+    - NSApplication activation for proper window focusing
+  </Card>
+  
+  <Card title="Windows" icon="windows">
+    - Windows 10/11
+    - Bundled WebView2 runtime
+    - MSI installer package
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build from Source" icon="hammer" href="/desktop/building">
+    Learn how to build the desktop app for development and production
+  </Card>
+  
+  <Card title="Release Process" icon="rocket" href="/desktop/releases">
+    Understand the automated release workflow and version management
+  </Card>
+</CardGroup>

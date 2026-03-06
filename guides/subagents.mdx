@@ -1,0 +1,426 @@
+---
+title: Subagent Orchestration
+description: Run background AI tasks with isolated sessions and automatic result delivery
+---
+
+# Subagent Orchestration
+
+Asta supports **subagent orchestration** for running background tasks in isolated sessions. Subagents are useful for:
+
+- **Long-running research** ("Learn about X for 10 minutes")
+- **Parallel tasks** ("Research competitors while I draft the pitch")
+- **Delegated work** ("Analyze this report and summarize key risks")
+- **Multi-step workflows** ("Create a Notion database and populate it")
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py`
+
+## How It Works
+
+1. **User requests a background task** (explicitly or via internal delegation)
+2. **Main agent spawns a subagent** in an isolated conversation
+3. **Subagent runs independently** (doesn't block the main chat)
+4. **Result auto-delivers** when complete (or times out)
+5. **Main agent continues** with the result
+
+<Note>
+  Subagents share the same AI provider and model as the main session unless overridden.
+</Note>
+
+## Command: `/subagents`
+
+Use `/subagents` to view and manage active subagent runs:
+
+```
+/subagents
+```
+
+**Output:**
+```
+📋 Active Subagents:
+
+1. sub_abc123 (running)
+   Task: Research Python asyncio best practices
+   Started: 2m ago
+   Model: claude-sonnet-4-20250514
+
+2. sub_def456 (completed)
+   Task: Analyze competitor pricing
+   Started: 5m ago
+   Duration: 3m 12s
+   Status: ✅ Complete
+```
+
+### Viewing Subagent Output
+
+```
+/subagents sub_abc123
+```
+
+Shows the full conversation history for that subagent.
+
+## Spawning Subagents
+
+### Automatic (Preferred)
+
+Asta automatically spawns subagents for tasks that benefit from isolation:
+
+```
+Research the top 3 Python async frameworks and compare them.
+I'll keep working on the codebase while you do that.
+```
+
+Asta detects this pattern and spawns a background subagent for the research task.
+
+### Explicit (Advanced)
+
+Use the `sessions_spawn` tool directly:
+
+```json
+{
+  "task": "Learn about Rust async for 5 minutes",
+  "label": "Rust research",
+  "runTimeoutSeconds": 300,
+  "cleanup": "keep"
+}
+```
+
+**Parameters:**
+- `task` (required): The instruction for the subagent
+- `label` (optional): Human-readable label
+- `runTimeoutSeconds` (optional): Max execution time (default: 30 minutes)
+- `cleanup` (optional): `keep` or `delete` (default: `keep`)
+- `model` (optional): Override the AI model for this subagent
+- `thinking` (optional): Override thinking level (`off`, `low`, `medium`, `high`, `xhigh`)
+
+## Subagent Operations
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py:52-157`
+
+### `sessions_spawn`
+
+Spawn a new background subagent run.
+
+**Returns immediately** with a `runId` and `sessionId`. The subagent runs asynchronously.
+
+**Response:**
+```json
+{
+  "status": "accepted",
+  "runId": "sub_abc123",
+  "childSessionKey": "default:subagent:sub_abc123",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "note": "auto-announces on completion — do not poll or wait"
+}
+```
+
+<Tip>
+  Don't poll for results. Subagents **auto-announce** when complete—you'll get an assistant message with the result.
+</Tip>
+
+### `sessions_list`
+
+List recent subagent runs for the current session.
+
+**Response:**
+```json
+{
+  "runs": [
+    {
+      "runId": "sub_abc123",
+      "status": "running",
+      "label": "Rust research",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "model": null,
+      "thinking": null
+    }
+  ],
+  "count": 1
+}
+```
+
+### `sessions_history`
+
+Read the full conversation history for a subagent.
+
+**Request:**
+```json
+{
+  "runId": "sub_abc123"
+}
+```
+
+**Response:**
+```json
+{
+  "runId": "sub_abc123",
+  "status": "completed",
+  "messages": [
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+  ]
+}
+```
+
+### `sessions_send`
+
+Send a follow-up message to a running subagent.
+
+**Request:**
+```json
+{
+  "runId": "sub_abc123",
+  "message": "Focus on performance benchmarks",
+  "timeoutSeconds": 30
+}
+```
+
+**Optional wait:** If `timeoutSeconds > 0`, waits for a reply (default: 30 seconds). Otherwise returns immediately.
+
+### `sessions_stop`
+
+Stop a running subagent.
+
+**Request:**
+```json
+{
+  "runId": "sub_abc123"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "stopped",
+  "runId": "sub_abc123"
+}
+```
+
+## Configuration
+
+Set these in `.env` or Settings:
+
+```bash
+# Max concurrent subagents (default: 3)
+ASTA_SUBAGENTS_MAX_CONCURRENT=3
+
+# Max nesting depth (default: 1 = no nested subagents)
+ASTA_SUBAGENTS_MAX_DEPTH=1
+
+# Max children per parent session (default: 5)
+ASTA_SUBAGENTS_MAX_CHILDREN=5
+
+# Archive completed runs after N minutes (default: 60)
+ASTA_SUBAGENTS_ARCHIVE_AFTER_MINUTES=60
+```
+
+### Concurrency Limits
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py:491-521`
+
+Asta enforces these limits:
+
+1. **Max concurrent:** Only N subagents can run at once (default: 3)
+2. **Max depth:** Subagents cannot spawn their own subagents by default (depth=1)
+3. **Max children:** Each session can have at most N active child subagents (default: 5)
+
+If limits are exceeded, `sessions_spawn` returns:
+```json
+{
+  "status": "busy",
+  "error": "Max concurrent subagents reached (3).",
+  "maxConcurrent": 3,
+  "running": 3
+}
+```
+
+## Lifecycle & Auto-Announce
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py:351-437`
+
+### States
+
+| State | Description |
+|-------|-------------|
+| `running` | Subagent is actively processing |
+| `completed` | Finished successfully |
+| `timeout` | Exceeded `runTimeoutSeconds` |
+| `stopped` | Stopped by user or system |
+| `error` | Crashed or failed |
+| `interrupted` | Recovered after restart (stale state) |
+
+### Auto-Announce
+
+When a subagent finishes (any terminal state), Asta automatically:
+
+1. **Adds an assistant message** to the parent session with the result
+2. **Sends a notification** (if running in Telegram)
+3. **Archives the session** after N minutes (default: 60)
+
+**Example announcement:**
+```
+Subagent "Rust research" finished.
+
+[Summary of findings]
+- Tokio is the most popular async runtime
+- async-std is simpler for beginners
+- Performance: Tokio > async-std > smol
+```
+
+<Note>
+  You don't need to poll or wait for results. The result will appear as a new message when ready.
+</Note>
+
+## Use Cases
+
+### Background Research
+
+**User:**
+```
+Learn about GraphQL best practices for 5 minutes while I work on the API schema.
+```
+
+**Asta:**
+1. Spawns a subagent: `sessions_spawn({task: "Learn about GraphQL...", runTimeoutSeconds: 300})`
+2. Returns immediately: "I've started background research. I'll let you know when it's done."
+3. User continues working
+4. 5 minutes later, result auto-delivers: "Here's what I learned about GraphQL..."
+
+### Parallel Tasks
+
+**User:**
+```
+Analyze our top 3 competitors and draft a feature comparison table.
+```
+
+**Asta:**
+1. Spawns 3 subagents (one per competitor)
+2. Each researches independently
+3. Results merge when all complete
+4. Drafts table with findings
+
+### Multi-Step Workflows
+
+**User:**
+```
+Create a Notion database for project tracking, add 5 sample tasks, and set up automation.
+```
+
+**Asta:**
+1. Spawns a subagent for the full workflow
+2. Subagent executes each step sequentially
+3. Returns final state (database URL, task IDs)
+4. Main chat continues without blocking
+
+## Debugging Subagents
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py:631-655`
+
+### Viewing Logs
+
+Subagent activity is logged to `backend/asta.log`:
+
+```bash
+tail -f ~/workspace/source/backend/asta.log | grep -i subagent
+```
+
+**Key log lines:**
+- `Spawning subagent: sub_xxx` — Subagent started
+- `Subagent sub_xxx completed` — Finished successfully
+- `Subagent sub_xxx timeout` — Exceeded time limit
+- `Marked N stale running subagents interrupted` — Recovered after restart
+
+### Checking Status
+
+Use the desktop app or web panel:
+
+1. Go to **Chat → Subagents** (sidebar)
+2. View active and recent subagent runs
+3. Click a run to see its full history
+
+### Stale Runs After Restart
+
+Source: `~/workspace/source/backend/app/subagent_orchestrator.py:631-654`
+
+If Asta restarts while subagents are running, they're marked as `interrupted` on startup. The main session receives:
+
+```
+Subagent "X" was interrupted by restart.
+```
+
+You can re-run the task or continue manually.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Subagent never finishes">
+    Check the timeout:
+    - Default: 30 minutes
+    - Set explicit timeout: `runTimeoutSeconds: 600` (10 minutes)
+
+    If the task is legitimately long-running, increase the timeout.
+  </Accordion>
+
+  <Accordion title="'Max concurrent subagents reached'">
+    Wait for a running subagent to complete, or stop one:
+
+    ```
+    /subagents
+    /subagents stop sub_abc123
+    ```
+
+    Or increase the limit in `.env`:
+    ```bash
+    ASTA_SUBAGENTS_MAX_CONCURRENT=5
+    ```
+  </Accordion>
+
+  <Accordion title="Result not announced">
+    Check:
+    1. Subagent status: `/subagents`
+    2. Backend logs: `tail -f asta.log | grep -i subagent`
+    3. Parent conversation ID matches current session
+
+    If stuck in `running` state, manually stop it:
+    ```
+    /subagents stop sub_xxx
+    ```
+  </Accordion>
+
+  <Accordion title="Cannot spawn nested subagents">
+    By default, `ASTA_SUBAGENTS_MAX_DEPTH=1` (no nesting).
+
+    To allow nested subagents:
+    ```bash
+    ASTA_SUBAGENTS_MAX_DEPTH=2
+    ```
+
+    This lets subagents spawn their own subagents (depth 2).
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **Subagents count against your AI provider's rate limits.** Three concurrent subagents = 3x API usage. Monitor your provider dashboard.
+</Warning>
+
+## Advanced: Custom Subagent Models
+
+Override the model for specific subagents:
+
+```json
+{
+  "task": "Generate 10 blog post ideas",
+  "model": "claude-opus-4-20250514",
+  "thinking": "high"
+}
+```
+
+Useful for:
+- **Cost optimization** (use cheaper models for simple tasks)
+- **Quality boost** (use premium models for complex analysis)
+- **Provider testing** (compare results across models)
+
+## Next Steps
+
+- [Exec Tool Security](/guides/exec-tool) - Run commands in subagents
+- [Creating Skills](/guides/creating-skills) - Build multi-step workflows
+- [Telegram Bot Setup](/guides/telegram-bot) - Use subagents from mobile

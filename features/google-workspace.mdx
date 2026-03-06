@@ -1,0 +1,619 @@
+---
+title: "Google Workspace"
+description: "Integrate Gmail, Calendar, Drive, and Contacts using the gog CLI tool"
+---
+
+Asta integrates with Google Workspace (Gmail, Calendar, Drive, and Contacts) using the powerful [gog CLI](https://gogcli.sh) tool. This integration allows you to read emails, manage calendar events, search Drive files, and access contacts using natural language.
+
+## Prerequisites
+
+The Google Workspace integration requires the `gog` CLI tool to be installed and authenticated.
+
+<Steps>
+  <Step title="Install gog">
+    Install the gog CLI using Homebrew:
+    
+    ```bash
+    brew install gogcli
+    ```
+    
+    <Note>
+      gog is a Go-based CLI for Google Workspace. Visit [gogcli.sh](https://gogcli.sh) for installation on other platforms.
+    </Note>
+  </Step>
+
+  <Step title="Get OAuth credentials">
+    Create a Google Cloud project and download OAuth credentials:
+    
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new project or select an existing one
+    3. Enable Gmail, Calendar, Drive, and Contacts APIs
+    4. Go to **Credentials** > **Create Credentials** > **OAuth 2.0 Client ID**
+    5. Download the `client_secret.json` file
+  </Step>
+
+  <Step title="Configure gog credentials">
+    Set up gog with your OAuth credentials:
+    
+    ```bash
+    gog auth credentials /path/to/client_secret.json
+    ```
+  </Step>
+
+  <Step title="Authenticate your account">
+    Add your Google account with required services:
+    
+    ```bash
+    gog auth add your@gmail.com --services gmail,calendar,drive,contacts
+    ```
+    
+    This will open a browser for OAuth consent. Grant the requested permissions.
+  </Step>
+
+  <Step title="Set default account (optional)">
+    Configure your default Google account:
+    
+    ```bash
+    export GOG_ACCOUNT="your@gmail.com"
+    # or
+    export GOOGLE_ACCOUNT="your@gmail.com"
+    ```
+  </Step>
+</Steps>
+
+## Gmail Integration
+
+Search, read, and send emails using natural language.
+
+### Searching Emails
+
+```
+check my email
+read my inbox
+show unread emails
+search gmail for receipts
+find emails from john
+```
+
+Asta uses Gmail's powerful search syntax:
+
+```bash
+# Default: emails from last 7 days
+gog gmail search "newer_than:7d" --max 10 --json
+
+# Custom queries
+gog gmail search "from:john@example.com" --max 10 --json
+gog gmail search "subject:invoice is:unread" --max 10 --json
+```
+
+### Sending Emails
+
+```
+send email to john@example.com
+subject: Meeting tomorrow
+body: Let's meet at 3pm
+```
+
+The skill extracts fields from your message:
+
+```python
+to = "john@example.com"
+subject = "Meeting tomorrow"
+body = "Let's meet at 3pm"
+```
+
+And executes:
+
+```bash
+gog gmail send \
+  --to john@example.com \
+  --subject "Meeting tomorrow" \
+  --body "Let's meet at 3pm" \
+  --account your@gmail.com
+```
+
+<CodeGroup>
+```python Search emails
+from app.skills.gog import run_gog
+
+# Search recent emails
+result = await run_gog([
+    "gmail", "search",
+    "newer_than:7d",
+    "--max", "10",
+    "--json",
+    "--account", "your@gmail.com"
+])
+
+# Parse JSON response
+import json
+emails = json.loads(result["stdout"])
+```
+
+```python Send email
+result = await run_gog([
+    "gmail", "send",
+    "--to", "recipient@example.com",
+    "--subject", "Hello from Asta",
+    "--body", "This is an automated email.",
+    "--account", "your@gmail.com"
+])
+
+if result["returncode"] == 0:
+    print("Email sent successfully")
+```
+</CodeGroup>
+
+### Gmail Search Queries
+
+Supported Gmail search syntax:
+
+- `from:sender@example.com` - Emails from specific sender
+- `to:recipient@example.com` - Emails to specific recipient
+- `subject:keyword` - Search in subject line
+- `is:unread` - Unread emails only
+- `is:starred` - Starred emails
+- `newer_than:7d` - Emails from last 7 days
+- `older_than:1m` - Emails older than 1 month
+- `has:attachment` - Emails with attachments
+- `filename:pdf` - Specific attachment type
+
+## Calendar Integration
+
+Manage calendar events and check your schedule.
+
+### Viewing Events
+
+```
+what's on my calendar today?
+show my calendar for tomorrow
+what do I have scheduled this week?
+list my meetings
+```
+
+Asta automatically determines the date range:
+
+```python
+if "today" in text:
+    start = today
+    end = tomorrow
+elif "tomorrow" in text:
+    start = tomorrow  
+    end = day_after_tomorrow
+else:
+    start = today
+    end = today + 7 days  # Default: next week
+```
+
+Executes:
+
+```bash
+gog calendar events primary \
+  --from 2026-03-06 \
+  --to 2026-03-13 \
+  --json \
+  --account your@gmail.com
+```
+
+### Creating Events
+
+```
+create event
+title: Team standup
+start: 2026-03-07T09:00
+end: 2026-03-07T09:30
+location: Zoom
+```
+
+The skill parses structured fields:
+
+```python
+title = "Team standup"
+start = "2026-03-07T09:00"
+end = "2026-03-07T09:30"
+location = "Zoom"
+```
+
+And creates the event:
+
+```bash
+gog calendar create primary \
+  --summary "Team standup" \
+  --from "2026-03-07T09:00" \
+  --to "2026-03-07T09:30" \
+  --location "Zoom" \
+  --account your@gmail.com
+```
+
+<CodeGroup>
+```python List events
+from datetime import datetime, timedelta
+
+# Get events for next 7 days
+today = datetime.now().strftime("%Y-%m-%d")
+next_week = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+
+result = await run_gog([
+    "calendar", "events", "primary",
+    "--from", today,
+    "--to", next_week,
+    "--json",
+    "--account", "your@gmail.com"
+])
+
+events = json.loads(result["stdout"])
+```
+
+```python Create event
+result = await run_gog([
+    "calendar", "create", "primary",
+    "--summary", "Team Meeting",
+    "--from", "2026-03-07T14:00",
+    "--to", "2026-03-07T15:00",
+    "--location", "Conference Room A",
+    "--account", "your@gmail.com"
+])
+```
+</CodeGroup>
+
+### Date/Time Formats
+
+Supported formats for event times:
+
+- ISO 8601: `2026-03-07T14:00`
+- Date only: `2026-03-07` (all-day event)
+- With timezone: `2026-03-07T14:00-05:00`
+
+## Drive Integration
+
+Search for files in Google Drive.
+
+### Searching Files
+
+```
+search my drive for presentation
+find files in google drive
+query: project report
+limit: 20
+```
+
+Executes:
+
+```bash
+gog drive search "project report" --max 20 --json
+```
+
+<CodeGroup>
+```python Search Drive
+result = await run_gog([
+    "drive", "search",
+    "presentation",  # Query
+    "--max", "10",
+    "--json"
+])
+
+files = json.loads(result["stdout"])
+for file in files:
+    print(f"Name: {file['name']}")
+    print(f"Type: {file['mimeType']}")
+    print(f"URL: {file['webViewLink']}")
+```
+</CodeGroup>
+
+### Drive Search Queries
+
+Google Drive search syntax:
+
+- Simple text: `project report`
+- File name: `name:'Budget 2024'`
+- File type: `mimeType='application/pdf'`
+- Modified date: `modifiedTime > '2024-01-01'`
+- Owned by me: `'me' in owners`
+- Shared with me: `sharedWithMe`
+
+## Contacts Integration
+
+List and search your Google Contacts.
+
+### Listing Contacts
+
+```
+show my contacts
+list google contacts
+limit: 50
+```
+
+Executes:
+
+```bash
+gog contacts list --max 20 --json
+```
+
+<CodeGroup>
+```python List contacts
+result = await run_gog([
+    "contacts", "list",
+    "--max", "20",
+    "--json"
+])
+
+contacts = json.loads(result["stdout"])
+for contact in contacts:
+    print(f"Name: {contact['name']}")
+    print(f"Email: {contact['email']}")
+    print(f"Phone: {contact['phone']}")
+```
+</CodeGroup>
+
+## Natural Language Processing
+
+The Google Workspace skill uses keyword detection to route requests:
+
+```python
+def check_eligibility(self, text: str, user_id: str) -> bool:
+    t = text.lower()
+    return any(keyword in t for keyword in [
+        # Gmail
+        "gmail", "email", "inbox", "mail", "unread",
+        "send email", "check email", "my emails",
+        
+        # Calendar
+        "calendar", "event", "meeting", "schedule",
+        "appointment", "what do i have", "add to calendar",
+        
+        # Drive
+        "google drive", "drive file", "my drive",
+        
+        # Contacts
+        "google contacts", "my contacts",
+        
+        # Generic
+        "google doc", "google sheet", "gog "
+    ])
+```
+
+## Field Extraction
+
+The skill extracts structured data from natural language:
+
+```python
+def _extract_field(self, text: str, name: str) -> str | None:
+    """Extract 'name: value' from text."""
+    import re
+    m = re.search(
+        rf'{re.escape(name)}[:\s]+["\']?([^"\'
+]+)["\']?',
+        text,
+        re.IGNORECASE
+    )
+    return m.group(1).strip() if m else None
+
+def _extract_number(self, text: str, word: str) -> int | None:
+    """Extract 'word: 123' from text."""
+    import re
+    m = re.search(
+        rf'(?:{re.escape(word)})[:\s]*(\d+)',
+        text,
+        re.IGNORECASE
+    )
+    return int(m.group(1)) if m else None
+```
+
+Usage:
+
+```python
+to = self._extract_field(text, "to")
+subject = self._extract_field(text, "subject")
+limit = self._extract_number(text, "limit") or 10
+```
+
+## Error Handling
+
+The skill provides helpful error messages:
+
+### gog Not Installed
+
+```json
+{
+  "gog_error": "Google Workspace CLI (`gog`) not installed.",
+  "gog_fix": "Install with: brew install gogcli",
+  "gog_needs_cli": true
+}
+```
+
+### Not Authenticated
+
+```json
+{
+  "gog_error": "Google Workspace not authenticated.",
+  "gog_fix": "1. brew install gogcli\n2. gog auth credentials /path/to/client_secret.json\n3. gog auth add your@gmail.com --services gmail,calendar,drive,contacts",
+  "gog_needs_auth": true
+}
+```
+
+### Command Failed
+
+```json
+{
+  "gog_error": "stderr output from gog",
+  "gog_command": "gog gmail search ..."
+}
+```
+
+## Implementation Details
+
+The Google Workspace skill is implemented in `backend/app/skills/gog.py`.
+
+### Binary Detection
+
+```python
+def _gog_bin() -> str | None:
+    """Find gog binary in common locations."""
+    for path in ["/opt/homebrew/bin/gog", "/usr/local/bin/gog"]:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    # Also check PATH
+    import shutil
+    return shutil.which("gog")
+```
+
+### Safe Command Execution
+
+```python
+async def run_gog(args: list[str], timeout: float = 15.0) -> dict:
+    """Run gog command safely (no shell injection)."""
+    gog = _gog_bin()
+    if not gog:
+        return {"error": "gog not found", "returncode": 127}
+    
+    proc = await asyncio.create_subprocess_exec(
+        gog, *args,  # Safe: no shell=True
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=os.environ.copy()
+    )
+    
+    stdout, stderr = await asyncio.wait_for(
+        proc.communicate(),
+        timeout=timeout
+    )
+    
+    return {
+        "stdout": stdout.decode(errors="replace").strip(),
+        "stderr": stderr.decode(errors="replace").strip(),
+        "returncode": proc.returncode
+    }
+```
+
+<Note>
+  The skill uses `asyncio.create_subprocess_exec` (not `shell=True`) to prevent shell injection vulnerabilities.
+</Note>
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Default Google account for gog commands
+export GOG_ACCOUNT="your@gmail.com"
+# or
+export GOOGLE_ACCOUNT="your@gmail.com"
+```
+
+### gog Binary Paths
+
+Searched in order:
+1. `/opt/homebrew/bin/gog` (Apple Silicon Mac)
+2. `/usr/local/bin/gog` (Intel Mac / Linux)
+3. System PATH
+
+## Best Practices
+
+<Steps>
+  <Step title="Use structured input for commands">
+    When creating events or sending emails, use clear field separators:
+    
+    ```
+    send email
+    to: john@example.com
+    subject: Meeting Notes
+    body: Here are the notes from today's meeting...
+    ```
+  </Step>
+
+  <Step title="Specify date ranges for calendar">
+    Be explicit about time periods:
+    - ✅ `show my calendar for tomorrow`
+    - ✅ `what's on my calendar today`
+    - ❌ `show calendar` (defaults to 7 days)
+  </Step>
+
+  <Step title="Use Gmail search syntax">
+    Leverage Gmail's powerful search:
+    - `from:boss@company.com is:unread`
+    - `subject:invoice newer_than:7d`
+    - `has:attachment filename:pdf`
+  </Step>
+
+  <Step title="Set default account">
+    Configure `GOG_ACCOUNT` to avoid specifying account in every command.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### gog command not found
+
+**Solution**:
+```bash
+brew install gogcli
+# Verify installation
+which gog
+gog version
+```
+
+### Authentication errors
+
+**Solution**:
+```bash
+# Re-authenticate
+gog auth add your@gmail.com --services gmail,calendar,drive,contacts
+
+# List authenticated accounts
+gog auth list
+```
+
+### Permission denied errors
+
+**Solution**:
+- Check that you granted all requested scopes during OAuth
+- Re-run `gog auth add` to update permissions
+- Ensure APIs are enabled in Google Cloud Console
+
+### Timeout errors
+
+**Solution**:
+- Increase timeout in `run_gog()` call
+- Check network connectivity
+- Verify gog service status
+
+### JSON parse errors
+
+**Solution**:
+- Ensure `--json` flag is included in command
+- Check for non-JSON output in stderr
+- Verify gog version supports JSON output
+
+## API Reference
+
+Key functions in `backend/app/skills/gog.py`:
+
+```python
+# Run gog command safely
+await run_gog(args: list[str], timeout: float = 15.0) -> dict
+
+# Execute Google Workspace skill
+await GoogleWorkspaceSkill.execute(
+    user_id: str,
+    text: str,
+    extra: dict[str, Any]
+) -> dict[str, Any]
+
+# Check if message is Google-related
+GoogleWorkspaceSkill.check_eligibility(
+    text: str,
+    user_id: str
+) -> bool
+```
+
+Return format:
+
+```python
+{
+    "gog_output": "...",      # Raw stdout
+    "gog_data": [...],        # Parsed JSON (if applicable)
+    "gog_command": "...",     # Command that was run
+    "gog_summary": "...",     # Human-readable summary
+    "gog_error": "...",       # Error message (if failed)
+}
+```

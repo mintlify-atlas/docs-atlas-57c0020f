@@ -1,0 +1,311 @@
+---
+title: API Keys
+description: Configure API keys for AI providers and integrations
+---
+
+Asta supports multiple methods for managing API keys: environment variables and the Settings UI.
+
+## Configuration Methods
+
+### Settings UI (Recommended)
+
+1. Open Asta and navigate to **Settings** → **API Keys**
+2. Enter your API keys for each provider
+3. Click **Save**
+
+Keys are stored securely in `backend/asta.db` and never committed to git.
+
+### Environment Variables
+
+Alternatively, set keys in `backend/.env`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENAI_API_KEY=sk-proj-...
+OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+Keys in the database take precedence over environment variables.
+
+## Provider Setup
+
+### Claude (Anthropic)
+
+<Steps>
+  <Step title="Get API Key">
+    1. Go to [console.anthropic.com](https://console.anthropic.com)
+    2. Sign up or log in
+    3. Navigate to **API Keys**
+    4. Create a new key
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste key in **Anthropic API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+    ```
+  </Step>
+  
+  <Step title="Test Connection">
+    In Settings → Status, click **Test** next to Claude to verify the key works.
+  </Step>
+</Steps>
+
+### OpenRouter
+
+OpenRouter provides access to 300+ models through a single API.
+
+<Steps>
+  <Step title="Get API Key">
+    1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
+    2. Sign up or log in
+    3. Create a new API key
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste key in **OpenRouter API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    OPENROUTER_API_KEY=sk-or-v1-your-key-here
+    ```
+  </Step>
+</Steps>
+
+### OpenAI
+
+<Steps>
+  <Step title="Get API Key">
+    1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+    2. Sign up or log in
+    3. Create a new secret key
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste key in **OpenAI API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    OPENAI_API_KEY=sk-proj-your-key-here
+    ```
+  </Step>
+</Steps>
+
+### Google Gemini
+
+<Steps>
+  <Step title="Get API Key">
+    1. Go to [aistudio.google.com](https://aistudio.google.com)
+    2. Click **Get API Key**
+    3. Create a new key
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste key in **Gemini API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    GEMINI_API_KEY=your-key-here
+    # Or
+    GOOGLE_AI_KEY=your-key-here
+    ```
+  </Step>
+</Steps>
+
+### Groq
+
+<Steps>
+  <Step title="Get API Key">
+    1. Go to [console.groq.com](https://console.groq.com)
+    2. Sign up or log in
+    3. Create an API key
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste key in **Groq API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    GROQ_API_KEY=gsk_your-key-here
+    ```
+  </Step>
+</Steps>
+
+### Hugging Face
+
+Used for image generation fallback (FLUX.1-dev).
+
+<Steps>
+  <Step title="Get API Token">
+    1. Go to [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+    2. Create a new token (read access is sufficient)
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste token in **Hugging Face API Key** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    HUGGINGFACE_API_KEY=hf_your-token-here
+    ```
+  </Step>
+</Steps>
+
+## Integration API Keys
+
+### Spotify
+
+Spotify requires a Client ID and Client Secret for search and playback.
+
+<Steps>
+  <Step title="Create Spotify App">
+    1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+    2. Log in with your Spotify account
+    3. Click **Create app**
+    4. Fill in:
+       - **App name**: "Asta" (or your choice)
+       - **App description**: "Personal AI workspace"
+       - **Redirect URI**: See step 2 below
+    5. Accept terms and click **Create**
+  </Step>
+  
+  <Step title="Configure Redirect URI">
+    For **playback control**, add this redirect URI in your app settings:
+    
+    **Production:**
+    ```
+    https://your-domain.com/api/spotify/callback
+    ```
+    
+    **Local development:**
+    ```
+    http://127.0.0.1:8010/api/spotify/callback
+    ```
+    
+    <Note>
+      Spotify requires `127.0.0.1` (not `localhost`) for local development.
+    </Note>
+  </Step>
+  
+  <Step title="Get Credentials">
+    1. Open your app in the Spotify dashboard
+    2. Go to **Settings**
+    3. Copy **Client ID** and **Client secret**
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI (Recommended):**
+    - Go to Settings → Spotify
+    - Paste Client ID and Client secret
+    - Click **Save**
+    - Click **Connect Account** to enable playback
+    
+    **Or in `.env`:**
+    ```bash
+    SPOTIFY_CLIENT_ID=your-client-id
+    SPOTIFY_CLIENT_SECRET=your-client-secret
+    ASTA_BASE_URL=https://your-domain.com  # For OAuth redirect
+    ```
+  </Step>
+</Steps>
+
+### Telegram Bot
+
+<Steps>
+  <Step title="Create Bot">
+    1. Open Telegram and message [@BotFather](https://t.me/botfather)
+    2. Send `/newbot`
+    3. Follow prompts to choose a name and username
+    4. Copy the bot token (format: `1234567890:ABC...`)
+  </Step>
+  
+  <Step title="Configure in Asta">
+    **Settings UI:**
+    - Go to Settings → API Keys
+    - Paste token in **Telegram Bot Token** field
+    - Save
+    
+    **Or in `.env`:**
+    ```bash
+    TELEGRAM_BOT_TOKEN=1234567890:ABC...
+    ```
+  </Step>
+  
+  <Step title="(Optional) Restrict Access">
+    To allow only specific Telegram users:
+    
+    1. Get your Telegram user ID (message [@userinfobot](https://t.me/userinfobot))
+    2. Add to `.env`:
+       ```bash
+       ASTA_TELEGRAM_ALLOWED_IDS=6168747695,1234567890
+       ```
+    
+    Empty = allow anyone with the bot token.
+  </Step>
+</Steps>
+
+### Pingram (Voice Calls)
+
+For voice reminders via phone calls.
+
+<Steps>
+  <Step title="Get Credentials">
+    1. Go to [app.notificationapi.com](https://app.notificationapi.com)
+    2. Sign up and create a project
+    3. Copy Client ID and Client Secret
+  </Step>
+  
+  <Step title="Configure in Asta">
+    In `backend/.env`:
+    ```bash
+    ASTA_OWNER_PHONE_NUMBER=+15551234567
+    ASTA_PINGRAM_CLIENT_ID=your-client-id
+    ASTA_PINGRAM_CLIENT_SECRET=your-client-secret
+    ASTA_PINGRAM_API_KEY=your-api-key
+    ASTA_PINGRAM_NOTIFICATION_ID=cron_alert
+    ASTA_PINGRAM_TEMPLATE_ID=your-template-id
+    ```
+  </Step>
+</Steps>
+
+## Viewing Key Status
+
+To check which keys are configured:
+
+1. Open Settings → Status
+2. View **APIs** section
+3. Green checkmark = key is set and working
+4. Red X = key is missing or invalid
+
+Click **Test** next to any provider to verify the key works.
+
+## Security
+
+<Warning>
+  Never commit API keys to git. All keys should be in `backend/.env` or stored in the database (via Settings UI). Both are excluded from version control.
+</Warning>
+
+- Keys in Settings UI are stored in `backend/asta.db`
+- Database keys take precedence over `.env` variables
+- The `.env` file is in `.gitignore`
+- Only `.env.example` (with empty values) is tracked in git

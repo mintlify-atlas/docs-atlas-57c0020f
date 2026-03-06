@@ -1,0 +1,244 @@
+---
+title: 'Settings'
+description: 'Manage user settings and preferences'
+---
+
+## Get Settings Status
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/status \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "apis": {
+    "claude": true,
+    "openai": false,
+    "ollama": true
+  },
+  "integrations": {
+    "telegram": true
+  },
+  "thinking": {
+    "level": "medium"
+  },
+  "reasoning": {
+    "mode": "on"
+  },
+  "final": {
+    "mode": "off"
+  },
+  "skills": [
+    {
+      "id": "files",
+      "name": "Files",
+      "enabled": true,
+      "available": true
+    }
+  ]
+}
+```
+</ResponseExample>
+
+<ResponseField name="apis" type="object">
+  Status of configured API providers
+  <Expandable title="properties">
+    <ResponseField name="claude" type="boolean">
+      Claude/Anthropic API configured
+    </ResponseField>
+    <ResponseField name="openai" type="boolean">
+      OpenAI API configured
+    </ResponseField>
+    <ResponseField name="ollama" type="boolean">
+      Ollama connection available
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="thinking" type="object">
+  Thinking level configuration
+  <Expandable title="properties">
+    <ResponseField name="level" type="string">
+      Current thinking level: `off`, `minimal`, `low`, `medium`, `high`, or `xhigh`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="reasoning" type="object">
+  Reasoning mode configuration
+  <Expandable title="properties">
+    <ResponseField name="mode" type="string">
+      Current reasoning mode: `off`, `on`, or `stream`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Get Thinking Settings
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/settings/thinking \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "thinking_level": "medium",
+  "provider": "claude",
+  "model": "claude-3-5-sonnet-20241022",
+  "options": ["off", "minimal", "low", "medium", "high", "xhigh"],
+  "supports_xhigh": true
+}
+```
+</ResponseExample>
+
+<ResponseField name="thinking_level" type="string">
+  Current thinking level setting
+</ResponseField>
+
+<ResponseField name="provider" type="string">
+  Active AI provider
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  Currently selected model
+</ResponseField>
+
+<ResponseField name="options" type="array">
+  Available thinking level options for current provider
+</ResponseField>
+
+---
+
+## Update Thinking Settings
+
+<RequestExample>
+```bash
+curl -X PUT https://api.asta.app/api/settings/thinking \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thinking_level": "high"
+  }'
+```
+</RequestExample>
+
+<ParamField body="thinking_level" type="string" required>
+  Thinking level: `off`, `minimal`, `low`, `medium`, `high`, or `xhigh`
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "thinking_level": "high"
+}
+```
+</ResponseExample>
+
+---
+
+## Get Reasoning Settings
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/api/settings/reasoning \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "reasoning_mode": "on"
+}
+```
+</ResponseExample>
+
+<ResponseField name="reasoning_mode" type="string">
+  Current reasoning mode: `off`, `on`, or `stream`
+</ResponseField>
+
+---
+
+## Update Reasoning Settings
+
+<RequestExample>
+```bash
+curl -X PUT https://api.asta.app/api/settings/reasoning \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reasoning_mode": "stream"
+  }'
+```
+</RequestExample>
+
+<ParamField body="reasoning_mode" type="string" required>
+  Reasoning mode: `off`, `on`, or `stream`
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "reasoning_mode": "stream"
+}
+```
+</ResponseExample>
+
+---
+
+## Get Mood Settings
+
+<RequestExample>
+```bash
+curl -X GET https://api.asta.app/settings/mood \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "mood": "friendly"
+}
+```
+</ResponseExample>
+
+<ResponseField name="mood" type="string">
+  Current mood setting: `serious`, `friendly`, or `normal`
+</ResponseField>
+
+---
+
+## Update Mood Settings
+
+<RequestExample>
+```bash
+curl -X PUT https://api.asta.app/settings/mood \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mood": "serious"
+  }'
+```
+</RequestExample>
+
+<ParamField body="mood" type="string" required>
+  AI personality: `serious`, `friendly`, or `normal`
+</ParamField>
+
+<ResponseExample>
+```json
+{
+  "mood": "serious"
+}
+```
+</ResponseExample>

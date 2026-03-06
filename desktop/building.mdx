@@ -1,0 +1,336 @@
+---
+title: "Building the Desktop App"
+description: "Development and production build instructions for the Tauri desktop application"
+---
+
+This guide covers how to build the Asta desktop app from source for development and production use.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Node.js 18+">
+    The frontend requires Node.js 18 or later. Check your version:
+    
+    ```bash
+    node --version  # Should be v18.0.0 or higher
+    ```
+    
+    Download from [nodejs.org](https://nodejs.org/) if needed.
+  </Step>
+  
+  <Step title="Install Rust Toolchain">
+    Tauri requires Rust for native compilation. Install via rustup:
+    
+    ```bash
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    ```
+    
+    Verify installation:
+    
+    ```bash
+    rustc --version
+    cargo --version
+    ```
+  </Step>
+  
+  <Step title="Platform-Specific Dependencies">
+    ### macOS
+    
+    Install Xcode Command Line Tools:
+    
+    ```bash
+    xcode-select --install
+    ```
+    
+    ### Windows
+    
+    Install the required build tools:
+    
+    1. **Microsoft C++ Build Tools** - Download from [Visual Studio](https://visualstudio.microsoft.com/downloads/)
+    2. **WebView2** - Usually pre-installed on Windows 10/11
+    
+    ### Linux
+    
+    Install development dependencies (Debian/Ubuntu):
+    
+    ```bash
+    sudo apt update
+    sudo apt install libwebkit2gtk-4.1-dev \
+      build-essential \
+      curl \
+      wget \
+      file \
+      libxdo-dev \
+      libssl-dev \
+      libayatana-appindicator3-dev \
+      librsvg2-dev
+    ```
+  </Step>
+</Steps>
+
+## Development Build
+
+<Steps>
+  <Step title="Navigate to App Directory">
+    ```bash
+    cd MACWinApp/asta-app
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Install Node.js dependencies:
+    
+    ```bash
+    npm install
+    ```
+    
+    This installs:
+    - React and React DOM
+    - Tauri CLI and API
+    - TypeScript and Vite
+    - TailwindCSS
+    - Tauri plugins (global-shortcut, autostart, http, opener)
+  </Step>
+  
+  <Step title="Start Development Server">
+    Run the app in development mode with hot-reload:
+    
+    ```bash
+    npm run tauri dev
+    ```
+    
+    This will:
+    1. Start Vite dev server on `http://localhost:1420`
+    2. Compile the Rust backend
+    3. Launch the desktop app
+    4. Enable hot-reload for frontend changes
+    
+    <Note>
+      The first build takes longer as Cargo compiles all dependencies. Subsequent builds use caching and are much faster.
+    </Note>
+  </Step>
+</Steps>
+
+### Development Commands
+
+```bash
+# Run dev server only (no Tauri window)
+npm run dev
+
+# Build frontend only
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run Tauri CLI directly
+npm run tauri -- --help
+```
+
+## Production Build
+
+<Steps>
+  <Step title="Build for Your Platform">
+    Create an optimized production build:
+    
+    ```bash
+    npm run tauri build
+    ```
+    
+    This will:
+    1. Run `tsc && vite build` to compile frontend
+    2. Compile Rust in release mode with optimizations
+    3. Generate platform-specific installers
+  </Step>
+  
+  <Step title="Locate Build Artifacts">
+    Built binaries and installers are placed in:
+    
+    ```
+    src-tauri/target/release/
+    ```
+    
+    Platform-specific bundles:
+    
+    ### macOS
+    ```
+    src-tauri/target/release/bundle/dmg/
+      └── Asta_1.4.2_aarch64.dmg    # Apple Silicon
+      └── Asta_1.4.2_x86_64.dmg     # Intel
+    
+    src-tauri/target/release/bundle/macos/
+      └── Asta.app                   # Application bundle
+    ```
+    
+    ### Windows
+    ```
+    src-tauri/target/release/bundle/msi/
+      └── Asta_1.4.2_x64_en-US.msi   # MSI installer
+    
+    src-tauri/target/release/bundle/nsis/
+      └── Asta_1.4.2_x64-setup.exe   # NSIS installer
+    ```
+  </Step>
+</Steps>
+
+## Cross-Platform Builds
+
+### Building for macOS Architectures
+
+To build for a specific architecture on macOS:
+
+```bash
+# Apple Silicon (M1/M2/M3/M4)
+npm run tauri build -- --target aarch64-apple-darwin
+
+# Intel
+npm run tauri build -- --target x86_64-apple-darwin
+```
+
+You must install the target first:
+
+```bash
+rustup target add aarch64-apple-darwin
+rustup target add x86_64-apple-darwin
+```
+
+<Note>
+  Cross-compiling from Intel to Apple Silicon (or vice versa) on the same machine is supported by Rust and works seamlessly on macOS.
+</Note>
+
+### Building Universal Binaries
+
+For a universal macOS binary that runs on both architectures:
+
+```bash
+npm run tauri build -- --target universal-apple-darwin
+```
+
+## Configuration
+
+### Version Bumping
+
+The app version is defined in **two places** and must be kept in sync:
+
+1. **`package.json`** (line 4):
+```json
+{
+  "version": "1.4.2"
+}
+```
+
+2. **`src-tauri/Cargo.toml`** (line 3):
+```toml
+[package]
+version = "1.4.2"
+```
+
+3. **`src-tauri/tauri.conf.json`** (line 4):
+```json
+{
+  "version": "1.4.2"
+}
+```
+
+<Warning>
+  All three version numbers must match, or the build will fail or produce inconsistent results.
+</Warning>
+
+### Build Configuration
+
+The Tauri build is configured in `src-tauri/tauri.conf.json`:
+
+```json
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  }
+}
+```
+
+### Bundle Configuration
+
+Control which installers are generated:
+
+```json
+{
+  "bundle": {
+    "active": true,
+    "targets": "all",  // or ["dmg", "msi", "deb", "appimage"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",  // macOS
+      "icons/icon.ico"    // Windows
+    ]
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with 'command not found: tauri'">
+    Install the Tauri CLI:
+    
+    ```bash
+    npm install
+    ```
+    
+    The CLI is installed as a dev dependency via `@tauri-apps/cli`.
+  </Accordion>
+  
+  <Accordion title="Rust compilation errors">
+    Update your Rust toolchain:
+    
+    ```bash
+    rustup update stable
+    ```
+    
+    Clear the build cache:
+    
+    ```bash
+    cd src-tauri
+    cargo clean
+    cd ..
+    npm run tauri build
+    ```
+  </Accordion>
+  
+  <Accordion title="Frontend changes not reflecting">
+    Vite's hot-reload should work automatically. If not:
+    
+    1. Stop the dev server (Ctrl+C)
+    2. Clear Vite cache: `rm -rf node_modules/.vite`
+    3. Restart: `npm run tauri dev`
+  </Accordion>
+  
+  <Accordion title="macOS: 'App is damaged' error">
+    This happens when the app isn't code-signed. For development builds:
+    
+    ```bash
+    xattr -cr src-tauri/target/release/bundle/macos/Asta.app
+    ```
+    
+    For distribution, you need an Apple Developer certificate.
+  </Accordion>
+  
+  <Accordion title="Windows: MSI installation blocked">
+    Windows SmartScreen may block unsigned installers. For development:
+    
+    - Right-click the MSI → Properties → Unblock
+    - Or click "More info" → "Run anyway" during installation
+    
+    For distribution, sign the installer with a code signing certificate.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Release Process" icon="rocket" href="/desktop/releases">
+  Learn how to create automated releases with GitHub Actions
+</Card>

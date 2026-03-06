@@ -1,0 +1,371 @@
+---
+title: Workspace
+description: Configure Asta's OpenClaw-style workspace for context and custom skills
+---
+
+Asta uses an OpenClaw-style workspace to store your context, preferences, and custom skills. The workspace is a directory containing markdown files and skill folders.
+
+## Workspace Structure
+
+```
+workspace/
+├── USER.md           # Your name, location, preferences
+├── AGENTS.md         # Workspace conventions
+├── TOOLS.md          # Local notes (SSH hosts, device names, etc.)
+├── SOUL.md           # Asta's personality and tone
+├── skills/           # Custom skills
+│   ├── apple-notes/
+│   │   └── SKILL.md
+│   ├── notion/
+│   │   └── SKILL.md
+│   └── your-skill/
+│       └── SKILL.md
+└── notes/            # Local markdown notes (optional)
+```
+
+## Workspace Location
+
+By default, Asta creates `workspace/` at the project root (parent of `backend/`).
+
+To use a custom location:
+
+```bash
+# In backend/.env
+ASTA_WORKSPACE_DIR=/Users/you/asta-workspace
+```
+
+Asta creates the directory automatically if it doesn't exist.
+
+## Core Files
+
+### USER.md
+
+Information about you. Asta uses this for context, time/weather, and reminders.
+
+**Example:**
+```markdown
+# USER.md - About You
+
+- **Name:** Alex
+- **What to call you:** Alex
+- **Location:** San Francisco, CA
+- **Timezone:** America/Los_Angeles
+
+## Context
+
+Working on:
+- Building Asta documentation
+- Learning Rust
+
+Preferences:
+- Concise answers
+- Prefer code examples over explanations
+```
+
+**How Asta uses it:**
+- Weather queries use your location
+- Time queries use your timezone
+- Context helps personalize responses
+
+### AGENTS.md
+
+Defines workspace conventions. Asta injects this into context at the start of each session.
+
+**Example:**
+```markdown
+# AGENTS.md - Asta Workspace (OpenClaw-style)
+
+This workspace is your home. Asta injects this and the files below into context.
+
+## Every session
+
+- **SOUL.md** — who Asta is (tone, boundaries).
+- **USER.md** — who you are (name, preferences, context).
+- **TOOLS.md** — your local notes (camera names, SSH hosts, device nicknames).
+- **skills/** — each folder with `SKILL.md` is a skill.
+
+## Memory
+
+- Use RAG (Learning skill) for long-term learned knowledge.
+- For session continuity, the chat history is in context.
+
+## Safety
+
+- Don't exfiltrate private data.
+- Don't run destructive commands without asking.
+- When in doubt, ask.
+```
+
+### TOOLS.md
+
+Your local notes and environment specifics. Not for general preferences (use `USER.md` for that).
+
+**Example:**
+```markdown
+# TOOLS.md - Your Local Notes
+
+## SSH
+- home-server → 192.168.1.100, user: admin
+- work-vps → ssh://work.example.com, user: deploy
+
+## Devices
+- Living Room TV → Samsung Frame 2023
+- Kitchen Speaker → HomePod mini
+
+## Notion
+- Meeting notes parent page: 1234567890abcdef1234567890abcdef
+- Research page: abcdef1234567890abcdef1234567890
+```
+
+**How Asta uses it:**
+- SSH: knows which host to connect to
+- Devices: understands your device names
+- Notion: knows where to save notes
+
+### SOUL.md
+
+Defines Asta's personality, tone, and boundaries.
+
+**Example:**
+```markdown
+# SOUL.md - Who Asta Is
+
+## Core
+
+- **Be genuinely helpful.** Skip filler; just help.
+- **Have opinions.** Prefer things, find stuff amusing.
+- **Be resourceful.** Use context, skills, and tools before asking.
+- **Earn trust.** Careful with external actions; bold with reading.
+
+## Boundaries
+
+- Private stays private.
+- When in doubt, ask before acting externally.
+- Concise when needed, thorough when it matters.
+
+## Vibe
+
+The assistant you'd actually want to talk to. Not corporate. Not sycophant. Just good.
+```
+
+**How Asta uses it:**
+- Injected into every context build
+- Shapes tone and decision-making
+- Defines safety boundaries
+
+## Custom Skills
+
+Custom skills live in `workspace/skills/<skill-name>/SKILL.md`.
+
+### Creating a Skill
+
+<Steps>
+  <Step title="Create Skill Directory">
+    ```bash
+    mkdir -p workspace/skills/my-skill
+    ```
+  </Step>
+  
+  <Step title="Create SKILL.md">
+    ```bash
+    cd workspace/skills/my-skill
+    touch SKILL.md
+    ```
+  </Step>
+  
+  <Step title="Define Skill">
+    Add frontmatter and instructions:
+    
+    **YAML Frontmatter:**
+    ```yaml
+    ---
+    name: my-skill
+    description: Use when the user asks about X or Y
+    metadata:
+      openclaw:
+        emoji: "🔧"
+        os: ["darwin", "linux"]  # Optional: darwin, linux, windows
+        requires: { bins: ["my-tool"] }  # Optional: required binaries
+        install:
+          - id: brew
+            kind: brew
+            formula: my-tool
+            bins: ["my-tool"]
+            label: Install my-tool via Homebrew
+    ---
+    ```
+    
+    **Skill Instructions:**
+    
+    ```markdown
+    # My Skill
+    
+    Instructions for how to use this skill.
+    
+    ## Usage
+    
+    When the user asks for X, do Y.
+    ```
+    
+    **Example Commands:**
+    ```bash
+    my-tool --flag value
+    ```
+  </Step>
+  
+  <Step title="Enable in Asta">
+    1. Restart Asta backend
+    2. Go to Settings → Skills
+    3. Your skill appears in the list
+    4. Toggle it on
+  </Step>
+</Steps>
+
+### Skill with Required Binaries
+
+If your skill needs a CLI tool:
+
+```markdown
+---
+name: things-mac
+description: Mac only. Manage Things 3 todos via things CLI
+metadata:
+  openclaw:
+    emoji: "✅"
+    os: ["darwin"]
+    requires: { bins: ["things"] }
+    install:
+      - id: brew
+        kind: brew
+        formula: thingsapi/things/things
+        bins: ["things"]
+        label: Install things CLI via Homebrew
+---
+
+# Things (Mac)
+
+Manage Things 3 todos via the `things` CLI.
+
+## Add a todo
+
+```bash
+things add "Buy milk" --list Inbox
+```
+
+## List todos
+
+```bash
+things show today
+```
+```
+
+**What happens:**
+- Asta checks if `things` is in `$PATH`
+- Checks if `things` is in exec allowlist
+- If both true, skill is marked **Available**
+- If not, skill shows "Install & enable exec" hint
+
+### Skill Discovery
+
+Asta automatically discovers skills in `workspace/skills/*/SKILL.md` at runtime. No restart needed for enabling/disabling via UI, but new skills require a backend restart to be detected.
+
+## Workspace Configuration in Code
+
+The workspace path is resolved in `backend/app/config.py`:
+
+```python
+@property
+def workspace_path(self) -> Path | None:
+    """Resolved OpenClaw-style workspace directory."""
+    if (s := (self.asta_workspace_dir or "").strip()):
+        p = Path(s).resolve()
+        if p.is_dir():
+            return p
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    # Default: project root / workspace
+    backend_dir = Path(__file__).resolve().parent.parent
+    default = backend_dir.parent / "workspace"
+    default.mkdir(parents=True, exist_ok=True)
+    return default
+```
+
+Skill discovery is in `backend/app/workspace.py` (referenced in `backend/app/routers/settings.py:901`).
+
+## Using Workspace Context
+
+Asta injects workspace files into context automatically:
+
+1. At session start, `SOUL.md`, `USER.md`, `AGENTS.md`, `TOOLS.md` are loaded
+2. When a task matches a skill description, that `SKILL.md` is loaded
+3. Workspace files are always available for context
+
+**Example:**
+
+> **You:** What's the weather?
+>
+> **Asta:** *(reads `USER.md` → sees location "San Francisco" → calls weather API)*
+
+> **You:** Add "Buy milk" to Things
+>
+> **Asta:** *(matches `things-mac` skill → loads `SKILL.md` → runs `things add "Buy milk"`)*
+
+## Notes Storage
+
+You can store local notes in `workspace/notes/` or `workspace/memos/`. Asta can:
+- List notes
+- Read note contents
+- Create new notes
+
+For multi-device access, use Notion or Apple Notes instead (configured in `TOOLS.md`).
+
+## Backup and Sync
+
+Your workspace contains your personal context. Consider:
+
+- **Git:** Commit `workspace/` to a private repo (exclude sensitive keys)
+- **Cloud sync:** Use Dropbox, iCloud, or Syncthing
+- **Backup:** Regular backups to external drive
+
+<Warning>
+  Never commit API keys or secrets in workspace files. Use `backend/.env` or Settings UI for credentials.
+</Warning>
+
+## Example Workspace
+
+A complete example workspace:
+
+```
+workspace/
+├── USER.md              # "Name: Alex, Location: SF"
+├── AGENTS.md            # Workspace conventions
+├── TOOLS.md             # "SSH: home-server → 192.168.1.100"
+├── SOUL.md              # "Be concise, have opinions"
+├── skills/
+│   ├── apple-notes/
+│   │   └── SKILL.md     # Apple Notes via osascript
+│   ├── notion/
+│   │   └── SKILL.md     # Notion API integration
+│   └── things-mac/
+│       └── SKILL.md     # Things 3 CLI
+└── notes/
+    ├── projects.md
+    └── ideas.md
+```
+
+## Troubleshooting
+
+**Skill not appearing?**
+- Check `workspace/skills/<skill-name>/SKILL.md` exists
+- Restart backend
+- Check logs for skill discovery errors
+
+**Skill shows "Not available"?**
+- Check required binary is installed: `which <binary>`
+- Check exec allowlist: `ASTA_EXEC_ALLOWED_BINS` in `.env`
+- Check OS requirement matches your system
+
+**Workspace not loading?**
+- Check `ASTA_WORKSPACE_DIR` path is correct
+- Check directory exists and is readable
+- Check file encoding is UTF-8

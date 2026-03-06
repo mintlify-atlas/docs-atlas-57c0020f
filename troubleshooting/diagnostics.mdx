@@ -1,0 +1,353 @@
+---
+title: Diagnostics
+description: Run system diagnostics, check status, and debug issues
+---
+
+Asta includes built-in diagnostic tools to help you troubleshoot issues and verify your installation.
+
+## The `doc` Command
+
+The `doc` (or `doctor`) command runs safe diagnostics to check your Asta installation.
+
+### Basic Usage
+
+```bash
+./asta.sh doc
+```
+
+This command checks:
+- Python version (3.12 or 3.13 required)
+- Backend virtual environment
+- Backend `.env` configuration
+- Workspace `USER.md` file
+- API health endpoint
+- Enabled skill dependencies
+
+### Example Output
+
+```bash
+    ╭─────────────────────────────────────────╮
+    │         doc (safe diagnostics)          │
+    ╰─────────────────────────────────────────╯
+
+  ● python       ok  python3.12
+  ● backend venv present
+  ● backend .env present
+  ● workspace user present
+  ● api health   ok  /api/health
+  ● skill deps   ok  all enabled skills available
+
+  ● Doc checks passed.
+```
+
+## Auto-Fix with `--fix`
+
+The `--fix` flag attempts to automatically resolve common setup issues.
+
+```bash
+./asta.sh doc --fix
+```
+
+### What Auto-Fix Does
+
+<AccordionGroup>
+<Accordion title="Backend Virtual Environment" icon="python">
+If the backend `.venv` is missing, `--fix` will:
+1. Find a suitable Python version (3.12 or 3.13)
+2. Create the virtual environment
+3. Install all required dependencies from `requirements.txt`
+
+```bash
+./asta.sh doc --fix
+# Output:
+# ◆ backend venv  missing  attempting auto-fix
+# ● backend venv  fixed
+```
+</Accordion>
+
+<Accordion title="Environment Configuration" icon="gear">
+If `backend/.env` is missing and `.env.example` exists, `--fix` will copy it:
+
+```bash
+./asta.sh doc --fix
+# Output:
+# ● backend .env  fixed  copied from .env.example
+```
+</Accordion>
+
+<Accordion title="Workspace USER.md" icon="user">
+If `workspace/USER.md` is missing, `--fix` will create it with the default template:
+
+```bash
+./asta.sh doc --fix
+# Output:
+# ● workspace user  fixed  created workspace/USER.md
+```
+</Accordion>
+
+<Accordion title="Skill Dependencies" icon="puzzle-piece">
+For enabled skills with missing dependencies, `--fix` will attempt to install them automatically:
+
+```bash
+./asta.sh doc --fix
+# Output:
+# ◆ skill dep    memo  install memo: brew tap antoniorodr/memo && brew install memo
+# ● skill dep    fixed  memo
+```
+
+<Note>
+Some dependencies require manual installation. The diagnostic output will indicate when manual intervention is needed.
+</Note>
+</Accordion>
+</AccordionGroup>
+
+## Checking System Status
+
+The `status` command shows the current state of all Asta services and integrations.
+
+```bash
+./asta.sh status
+```
+
+### Example Status Output
+
+```bash
+  ─────────────────────────────────────────
+  system status
+  ─────────────────────────────────────────
+  ● backend   up  pid 12345
+  ─────────────────────────────────────────
+  
+  Server
+    • API:     http://localhost:8010
+    • Docs:    http://localhost:8010/docs
+  
+  Channels
+    • Telegram: connected
+  
+  Skills
+    • Web Search:    enabled
+    • Learning (RAG): enabled
+    • Spotify:       enabled
+    • Reminders:     enabled
+  ─────────────────────────────────────────
+```
+
+### Status Information Includes
+
+- **Backend Status:** Whether the backend is running and its process ID
+- **API Endpoints:** URLs for the API and documentation
+- **Channels:** Connected external channels (Telegram, etc.)
+- **Skills:** Enabled skills and their availability
+
+## Log Files
+
+Asta writes detailed logs that can help diagnose issues.
+
+### Log Locations
+
+<CardGroup cols={2}>
+<Card title="Backend Log" icon="file-lines">
+**Location:** `backend.log` (in repo root)
+
+**Contains:**
+- Backend startup messages
+- API request/response logs
+- Skill execution logs
+- Error tracebacks
+</Card>
+
+<Card title="Cloudflare Tunnel Log" icon="cloud">
+**Location:** `cloudflared.log` (in repo root)
+
+**Contains:**
+- Tunnel connection status
+- Public URL assignments
+- Network errors
+</Card>
+</CardGroup>
+
+### Viewing Logs
+
+**View the entire log:**
+```bash
+cat backend.log
+```
+
+**View recent logs (last 50 lines):**
+```bash
+tail -50 backend.log
+```
+
+**Follow logs in real-time:**
+```bash
+tail -f backend.log
+```
+
+**Search logs for errors:**
+```bash
+grep -i error backend.log
+grep -i exception backend.log
+```
+
+### Log Rotation
+
+Logs are automatically rotated when they exceed 5MB:
+- Current log: `backend.log`
+- Previous log: `backend.log.old`
+
+## Health Check Endpoint
+
+The backend exposes a health check endpoint at `/api/health`.
+
+```bash
+curl http://localhost:8010/api/health
+```
+
+**Expected response:**
+```json
+{
+  "status": "ok"
+}
+```
+
+## Interactive API Documentation
+
+Asta provides interactive API documentation powered by FastAPI.
+
+**Access at:** [http://localhost:8010/docs](http://localhost:8010/docs)
+
+### What You Can Do
+
+- View all available API endpoints
+- See request/response schemas
+- Test endpoints directly from the browser
+- View authentication requirements
+- Inspect model definitions
+
+## Common Diagnostic Workflows
+
+<AccordionGroup>
+<Accordion title="Backend won't start" icon="circle-exclamation">
+1. **Run diagnostics with auto-fix:**
+```bash
+./asta.sh doc --fix
+```
+
+2. **Check the backend log for errors:**
+```bash
+tail -50 backend.log
+```
+
+3. **Verify Python version:**
+```bash
+python3 --version  # Should be 3.12 or 3.13
+```
+
+4. **Check if port 8010 is in use:**
+```bash
+lsof -i :8010
+```
+
+5. **Try a clean restart:**
+```bash
+./asta.sh restart
+```
+</Accordion>
+
+<Accordion title="Skill not working" icon="puzzle-piece">
+1. **Check skill status:**
+```bash
+./asta.sh status
+```
+
+2. **Run diagnostics to check dependencies:**
+```bash
+./asta.sh doc
+```
+
+3. **Auto-fix missing dependencies:**
+```bash
+./asta.sh doc --fix
+```
+
+4. **Check backend logs for skill-specific errors:**
+```bash
+grep -i "skill_name" backend.log
+```
+
+5. **Verify skill is enabled in Settings → Skills**
+</Accordion>
+
+<Accordion title="Database issues" icon="database">
+1. **Check for lock errors in logs:**
+```bash
+grep -i "lock" backend.log
+```
+
+2. **Restart to release locks:**
+```bash
+./asta.sh restart
+```
+
+3. **Check database file permissions:**
+```bash
+ls -la backend/asta.db
+```
+
+4. **Check disk space:**
+```bash
+df -h .
+```
+
+5. **If corrupt, back up and recreate:**
+```bash
+cp backend/asta.db backend/asta.db.backup
+rm backend/asta.db
+./asta.sh start
+```
+</Accordion>
+
+<Accordion title="Performance issues" icon="gauge-high">
+1. **Check system resource usage:**
+```bash
+top -p $(lsof -ti :8010)
+```
+
+2. **Check log file size:**
+```bash
+du -h backend.log
+```
+
+3. **Monitor real-time logs:**
+```bash
+tail -f backend.log
+```
+
+4. **Check for repeated errors:**
+```bash
+grep -i error backend.log | sort | uniq -c | sort -rn
+```
+
+5. **Restart with fresh logs:**
+```bash
+mv backend.log backend.log.archive
+./asta.sh restart
+```
+</Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+If diagnostics don't resolve your issue:
+
+1. **Check the error reference:** See [Common Errors](/troubleshooting/common-errors) for specific error messages
+2. **Review the logs:** Look for ERROR or EXCEPTION messages in `backend.log`
+3. **Verify your setup:** Run `./asta.sh doc --fix` to ensure proper configuration
+4. **Check the API docs:** Visit `http://localhost:8010/docs` to test endpoints
+5. **Report the issue:** Include relevant log excerpts when seeking help
+
+## See Also
+
+- [Common Errors](/troubleshooting/common-errors) - Error messages and solutions
+- [Installation](/installation) - Initial setup guide

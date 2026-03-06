@@ -1,0 +1,494 @@
+---
+title: "Agents API"
+description: "Create and manage named AI agents with custom personalities"
+---
+
+The Agents API allows you to create, configure, and manage named AI agents backed by skill files. Each agent has a custom system prompt, model settings, and optional skills.
+
+---
+
+## List Agents
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/agents" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```bash cURL (Search)
+curl -X GET "http://localhost:8000/api/agents?q=researcher&active_only=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "agents": [
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "description": "Deep research and analysis specialist",
+      "emoji": "🔍",
+      "icon": "",
+      "avatar": "",
+      "category": "research",
+      "model": "claude-sonnet-4",
+      "thinking": "extended",
+      "skills": ["web-search", "rag"],
+      "system_prompt": "You are a meticulous researcher...",
+      "enabled": true,
+      "knowledge_path": "/workspace/skills/researcher/knowledge"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/agents
+```
+
+List all named agents with optional filtering.
+
+### Query Parameters
+
+<ParamField query="q" type="string">
+  Search query (matches id, name, or description)
+</ParamField>
+
+<ParamField query="active_only" type="boolean" default={false}>
+  Only return enabled agents
+</ParamField>
+
+<ParamField query="inactive_only" type="boolean" default={false}>
+  Only return disabled agents
+</ParamField>
+
+### Response
+
+<ResponseField name="agents" type="object[]">
+  Array of agent definitions
+  <ResponseField name="agents[].id" type="string">
+    Unique agent identifier (slug)
+  </ResponseField>
+  <ResponseField name="agents[].name" type="string">
+    Display name
+  </ResponseField>
+  <ResponseField name="agents[].description" type="string">
+    Agent description
+  </ResponseField>
+  <ResponseField name="agents[].emoji" type="string">
+    Agent emoji (default: 🤖)
+  </ResponseField>
+  <ResponseField name="agents[].model" type="string">
+    Preferred model (e.g., `claude-sonnet-4`)
+  </ResponseField>
+  <ResponseField name="agents[].thinking" type="string">
+    Thinking mode (e.g., `extended`, `fast`)
+  </ResponseField>
+  <ResponseField name="agents[].skills" type="string[]">
+    Enabled skill IDs (e.g., `["web-search", "rag"]`)
+  </ResponseField>
+  <ResponseField name="agents[].system_prompt" type="string">
+    Custom system prompt
+  </ResponseField>
+  <ResponseField name="agents[].enabled" type="boolean">
+    Whether the agent is active
+  </ResponseField>
+  <ResponseField name="agents[].knowledge_path" type="string">
+    Path to agent's knowledge directory
+  </ResponseField>
+</ResponseField>
+
+---
+
+## Create Agent
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/agents" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Researcher",
+    "description": "Deep research and analysis specialist",
+    "emoji": "🔍",
+    "category": "research",
+    "model": "claude-sonnet-4",
+    "thinking": "extended",
+    "skills": ["web-search", "rag"],
+    "system_prompt": "You are a meticulous researcher who excels at finding and analyzing information. Always cite sources and provide comprehensive analysis."
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "agent": {
+    "id": "researcher",
+    "name": "Researcher",
+    "description": "Deep research and analysis specialist",
+    "emoji": "🔍",
+    "icon": "",
+    "avatar": "",
+    "category": "research",
+    "model": "claude-sonnet-4",
+    "thinking": "extended",
+    "skills": ["web-search", "rag"],
+    "system_prompt": "You are a meticulous researcher...",
+    "enabled": true,
+    "knowledge_path": "/workspace/skills/researcher/knowledge"
+  }
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+POST /api/agents
+```
+
+Create a new named agent.
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Agent name (will be slugified to create ID)
+</ParamField>
+
+<ParamField body="description" type="string" default="">
+  Agent description
+</ParamField>
+
+<ParamField body="emoji" type="string" default="🤖">
+  Agent emoji
+</ParamField>
+
+<ParamField body="icon" type="string" default="">
+  Icon identifier (alternative to emoji)
+</ParamField>
+
+<ParamField body="avatar" type="string" default="">
+  Avatar URL or identifier
+</ParamField>
+
+<ParamField body="category" type="string" default="">
+  Agent category (e.g., "research", "coding")
+</ParamField>
+
+<ParamField body="model" type="string" default="">
+  Preferred model (e.g., `claude-sonnet-4`)
+</ParamField>
+
+<ParamField body="thinking" type="string" default="">
+  Thinking mode (e.g., `extended`, `fast`)
+</ParamField>
+
+<ParamField body="skills" type="string[]">
+  Array of skill IDs to enable (e.g., `["web-search", "rag"]`)
+</ParamField>
+
+<ParamField body="system_prompt" type="string" default="">
+  Custom system prompt defining agent behavior
+</ParamField>
+
+### Response
+
+<ResponseField name="agent" type="object">
+  Created agent object (same structure as list response)
+</ResponseField>
+
+---
+
+## Get Agent
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/agents/researcher" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "agent": {
+    "id": "researcher",
+    "name": "Researcher",
+    "description": "Deep research and analysis specialist",
+    "emoji": "🔍",
+    "model": "claude-sonnet-4",
+    "thinking": "extended",
+    "skills": ["web-search", "rag"],
+    "system_prompt": "You are a meticulous researcher...",
+    "enabled": true,
+    "knowledge_path": "/workspace/skills/researcher/knowledge"
+  }
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/agents/{agent_id}
+```
+
+Get a single agent by ID.
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  Agent ID (slug)
+</ParamField>
+
+---
+
+## Update Agent
+
+<RequestExample>
+```bash cURL
+curl -X PATCH "http://localhost:8000/api/agents/researcher" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Enhanced research specialist with web search",
+    "skills": ["web-search", "rag", "arxiv"]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "agent": {
+    "id": "researcher",
+    "name": "Researcher",
+    "description": "Enhanced research specialist with web search",
+    "emoji": "🔍",
+    "model": "claude-sonnet-4",
+    "thinking": "extended",
+    "skills": ["web-search", "rag", "arxiv"],
+    "system_prompt": "You are a meticulous researcher...",
+    "enabled": true,
+    "knowledge_path": "/workspace/skills/researcher/knowledge"
+  }
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+PATCH /api/agents/{agent_id}
+```
+
+Update an existing agent. All fields are optional.
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  Agent ID to update
+</ParamField>
+
+### Request Body (all fields optional)
+
+<ParamField body="name" type="string">
+  New agent name
+</ParamField>
+
+<ParamField body="description" type="string">
+  New description
+</ParamField>
+
+<ParamField body="emoji" type="string">
+  New emoji
+</ParamField>
+
+<ParamField body="icon" type="string">
+  New icon
+</ParamField>
+
+<ParamField body="avatar" type="string">
+  New avatar
+</ParamField>
+
+<ParamField body="category" type="string">
+  New category
+</ParamField>
+
+<ParamField body="model" type="string">
+  New model preference
+</ParamField>
+
+<ParamField body="thinking" type="string">
+  New thinking mode
+</ParamField>
+
+<ParamField body="skills" type="string[]">
+  New skills array (replaces existing)
+</ParamField>
+
+<ParamField body="system_prompt" type="string">
+  New system prompt
+</ParamField>
+
+---
+
+## Toggle Agent Status
+
+<RequestExample>
+```bash cURL (Enable)
+curl -X PUT "http://localhost:8000/api/agents/researcher/enabled" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+```
+
+```bash cURL (Disable)
+curl -X PUT "http://localhost:8000/api/agents/researcher/enabled" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": false}'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "agent": {
+    "id": "researcher",
+    "name": "Researcher",
+    "description": "Deep research and analysis specialist",
+    "enabled": true,
+    "...": "..."
+  }
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+PUT /api/agents/{agent_id}/enabled
+```
+
+Enable or disable an agent (marketplace-style toggle).
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  Agent ID to toggle
+</ParamField>
+
+### Request Body
+
+<ParamField body="enabled" type="boolean" required>
+  Whether to enable (`true`) or disable (`false`) the agent
+</ParamField>
+
+---
+
+## Delete Agent
+
+<RequestExample>
+```bash cURL
+curl -X DELETE "http://localhost:8000/api/agents/researcher" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "deleted": "researcher"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+DELETE /api/agents/{agent_id}
+```
+
+Permanently delete an agent and its skill folder.
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  Agent ID to delete
+</ParamField>
+
+---
+
+## Scaffold Agent Knowledge
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/agents/researcher/knowledge/scaffold" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "ok": true,
+  "agent_id": "researcher",
+  "knowledge_path": "/workspace/skills/researcher/knowledge"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+POST /api/agents/{agent_id}/knowledge/scaffold
+```
+
+Ensure local knowledge folders exist for the agent.
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  Agent ID
+</ParamField>
+
+---
+
+## Agent Mentions
+
+Agents can be invoked in messages using the `@Agent Name: message` syntax:
+
+```
+@Researcher: Find recent papers on transformer architectures
+```
+
+The API automatically:
+1. Parses the `@Agent Name:` prefix
+2. Resolves the agent by name or ID
+3. Applies the agent's system prompt and settings
+4. Executes the message with agent context
+
+Only enabled agents can be invoked via mentions.
+
+---
+
+## Skill Integration
+
+Agents can use bundled skills by specifying them in the `skills` array:
+
+```json
+{
+  "skills": ["web-search", "rag", "arxiv", "calculator"]
+}
+```
+
+Skills are normalized to lowercase with hyphens and stored in JSON format in the agent's SKILL.md frontmatter.

@@ -1,0 +1,257 @@
+---
+title: "Files API"
+description: "Manage local files with OpenClaw-style path permissions"
+---
+
+The Files API provides secure file operations with path-based access control. Files can be read and written only within allowed paths, and virtual roots provide access to Asta knowledge and user memories.
+
+## Virtual Roots
+
+Asta provides special virtual paths:
+- **`asta:knowledge`** — Access to README.md, CHANGELOG.md, and docs/*.md
+- **`user:memories`** — Access to user-specific memories (User.md)
+
+---
+
+## List Files
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/files/list?directory=asta:knowledge" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "root": "asta:knowledge",
+  "entries": [
+    {
+      "name": "README.md",
+      "path": "asta:knowledge/README.md",
+      "dir": false,
+      "size": null
+    },
+    {
+      "name": "CHANGELOG.md",
+      "path": "asta:knowledge/CHANGELOG.md",
+      "dir": false,
+      "size": null
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/files/list
+```
+
+### Query Parameters
+
+<ParamField query="directory" type="string">
+  Path to list files from. Use `asta:knowledge` for Asta docs, `user:memories` for user memories, or any allowed directory path.
+</ParamField>
+
+### Response
+
+<ResponseField name="root" type="string">
+  The root directory being listed
+</ResponseField>
+
+<ResponseField name="roots" type="string[]">
+  Available root paths when no directory is specified
+</ResponseField>
+
+<ResponseField name="entries" type="object[]">
+  List of files and directories
+  <ResponseField name="entries[].name" type="string">
+    File or directory name
+  </ResponseField>
+  <ResponseField name="entries[].path" type="string">
+    Full path to the file/directory
+  </ResponseField>
+  <ResponseField name="entries[].dir" type="boolean">
+    Whether this is a directory
+  </ResponseField>
+  <ResponseField name="entries[].size" type="number | null">
+    File size in bytes (null for directories)
+  </ResponseField>
+</ResponseField>
+
+---
+
+## Read File
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/files/read?path=asta:knowledge/README.md" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "path": "asta:knowledge/README.md",
+  "content": "# Asta\n\nYour personal AI workspace...\n"
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+GET /api/files/read
+```
+
+### Query Parameters
+
+<ParamField query="path" type="string" required>
+  Path to the file to read. Can be a virtual path (`asta:knowledge/...`, `user:memories/User.md`) or a real path within allowed directories.
+</ParamField>
+
+### Response
+
+<ResponseField name="path" type="string">
+  The requested file path
+</ResponseField>
+
+<ResponseField name="content" type="string">
+  File contents as UTF-8 text
+</ResponseField>
+
+### Access Control
+
+If the requested path is not in the allowlist, returns `403` with:
+
+```json
+{
+  "error": "Path not in allowed list. You can grant access in Settings → Allowed paths or use the Grant access button.",
+  "code": "PATH_ACCESS_REQUEST",
+  "requested_path": "/absolute/path/to/file"
+}
+```
+
+Clients can display a "Grant access" button and call `/api/files/allow-path` to add the path.
+
+---
+
+## Write File
+
+<RequestExample>
+```bash cURL
+curl -X PUT "http://localhost:8000/api/files/write?path=workspace/notes.txt" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "My notes for today..."
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "path": "/home/user/workspace/notes.txt",
+  "ok": true
+}
+```
+</ResponseExample>
+
+### Endpoint
+
+```
+PUT /api/files/write
+```
+
+### Query Parameters
+
+<ParamField query="path" type="string" required>
+  Path to write to. Can be workspace-relative (e.g., `workspace/notes.txt`) or absolute. Must be within allowed paths.
+</ParamField>
+
+### Request Body
+
+<ParamField body="content" type="string" required>
+  Content to write to the file (UTF-8)
+</ParamField>
+
+### Response
+
+<ResponseField name="path" type="string">
+  Absolute path where the file was written
+</ResponseField>
+
+<ResponseField name="ok" type="boolean">
+  Success indicator
+</ResponseField>
+
+### Special Cases
+
+- Writing to `user:memories/User.md` saves user memories
+- Workspace-relative paths are normalized (e.g., `~/workspace/file` → `workspace/file`)
+- Parent directories are created automatically
+
+---
+
+## Manage Allowed Paths
+
+### Get Allowed Paths
+
+<RequestExample>
+```bash cURL
+curl -X GET "http://localhost:8000/api/files/allowed-paths" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "paths": [
+    "/home/user/workspace",
+    "/home/user/Documents"
+  ]
+}
+```
+</ResponseExample>
+
+```
+GET /api/files/allowed-paths
+```
+
+Returns the list of allowed base paths (from env + user allowlist).
+
+### Grant Path Access
+
+<RequestExample>
+```bash cURL
+curl -X POST "http://localhost:8000/api/files/allow-path" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/home/user/Documents"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "path": "/home/user/Documents",
+  "ok": true
+}
+```
+</ResponseExample>
+
+```
+POST /api/files/allow-path
+```
+
+<ParamField body="path" type="string" required>
+  Path to add to the allowlist (file or directory). If a file, its parent directory is also added.
+</ParamField>

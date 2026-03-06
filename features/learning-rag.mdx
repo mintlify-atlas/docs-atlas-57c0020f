@@ -1,0 +1,454 @@
+---
+title: "Learning & RAG"
+description: "Teach Asta new knowledge with AI-powered retrieval augmented generation using local embeddings"
+---
+
+Asta's Learning & RAG (Retrieval Augmented Generation) system lets you teach it new knowledge that persists across conversations. Using local Ollama embeddings, Asta can learn from documents, websites, or any text you provide, then intelligently retrieve relevant information when needed.
+
+## How It Works
+
+The RAG system uses hybrid search combining:
+
+- **Vector similarity** (ChromaDB with cosine distance)
+- **Keyword search** (SQLite FTS5 full-text search)
+- **Weighted merging** (70% vector + 30% keyword by default)
+
+This approach, inspired by OpenClaw's hybrid memory search, provides better retrieval accuracy than vector search alone.
+
+## Setup
+
+Before using the learning feature, you need to set up Ollama with the embedding model.
+
+<Steps>
+  <Step title="Install Ollama">
+    Download and install Ollama from [ollama.ai](https://ollama.ai):
+    
+    ```bash
+    # macOS
+    brew install ollama
+    
+    # Linux
+    curl -fsSL https://ollama.ai/install.sh | sh
+    ```
+  </Step>
+
+  <Step title="Pull the embedding model">
+    Download the `nomic-embed-text` model (768 dimensions):
+    
+    ```bash
+    ollama pull nomic-embed-text
+    ```
+    
+    <Note>
+      This model is specifically designed for embeddings and is required for RAG to work.
+    </Note>
+  </Step>
+
+  <Step title="Start Ollama service">
+    Ensure Ollama is running:
+    
+    ```bash
+    # Default port: 11434
+    ollama serve
+    ```
+  </Step>
+
+  <Step title="Configure Ollama URL (optional)">
+    If Ollama is running on a different host or port, set the environment variable:
+    
+    ```bash
+    export OLLAMA_BASE_URL="http://localhost:11434"
+    ```
+  </Step>
+</Steps>
+
+## Learning New Knowledge
+
+Teach Asta new information using natural language commands.
+
+### Learn from Text
+
+```
+learn about Python for 5 minutes
+learn about machine learning
+teach yourself about quantum computing
+```
+
+When you ask Asta to learn about a topic, it will:
+
+1. Research the topic (web search, documentation, etc.)
+2. Extract and process the content
+3. Split text into 500-character chunks
+4. Generate embeddings using Ollama
+5. Store vectors in ChromaDB and keywords in SQLite FTS5
+
+### Learn from Documents
+
+You can also provide direct content to learn:
+
+```
+Here's our API documentation:
+[paste documentation]
+Learn this for future reference.
+```
+
+### Learn from URLs
+
+```
+learn from https://docs.example.com/guide
+read and remember this article: https://blog.example.com/post
+```
+
+## Querying Learned Knowledge
+
+Once Asta has learned something, it automatically retrieves relevant knowledge when you ask related questions.
+
+### Automatic Context Injection
+
+The RAG system runs on every message and injects relevant context:
+
+```
+You: What's the best way to handle async in Python?
+Asta: [Retrieves relevant chunks from learned Python knowledge]
+      Based on what I've learned about Python, async/await...
+```
+
+### Topic-Specific Queries
+
+You can query specific topics you've taught:
+
+```
+What did you learn about Python?
+Recall what you know about machine learning
+Show me what you learned about our API
+```
+
+### Hybrid Search Example
+
+When you ask a question:
+
+1. **Vector search**: Embeds your question and finds semantically similar chunks
+2. **Keyword search**: Searches for exact term matches using FTS5
+3. **Merge & rank**: Combines results with weighted scoring
+4. **Return top K**: Returns the 5 most relevant chunks (configurable)
+
+## Managing Learned Topics
+
+### List Topics
+
+See everything Asta has learned:
+
+```
+What have you learned?
+List all topics you know about
+Show me your knowledge base
+```
+
+Response includes:
+- Topic name
+- Number of chunks stored
+- Total content size
+
+### Delete Topics
+
+Remove learned knowledge:
+
+```
+Forget everything about Python
+Delete what you learned about machine learning
+Clear your knowledge about [topic]
+```
+
+### Update Topics
+
+Replace existing knowledge:
+
+```
+Update your Python knowledge with this new information:
+[new content]
+```
+
+This deletes old chunks and creates new embeddings.
+
+## Storage & Configuration
+
+The RAG system stores data in two locations:
+
+### ChromaDB (Vector Store)
+
+```bash
+# Default location
+~/workspace/source/backend/chroma_db/
+
+# Configure custom path
+export ASTA_CHROMA_PATH="/path/to/chroma"
+```
+
+Stores:
+- 768-dimensional embeddings (nomic-embed-text)
+- Document chunks (up to 500 characters each)
+- Metadata (topic name)
+- Collection: `asta_rag`
+
+### SQLite FTS5 (Keyword Index)
+
+```bash
+# Default location
+~/workspace/source/backend/rag_fts.db
+
+# Configure custom path
+export ASTA_FTS_PATH="/path/to/rag_fts.db"
+```
+
+Stores:
+- Document ID
+- Topic name
+- Full chunk text for keyword search
+- FTS5 index for fast text matching
+
+## Implementation Details
+
+The RAG service is implemented in `backend/app/rag/service.py`.
+
+<CodeGroup>
+```python Add knowledge
+from app.rag.service import get_rag
+
+# Get RAG service instance
+rag = get_rag()
+
+# Add new knowledge
+await rag.add(
+    topic="python",
+    text="Python is a high-level programming language...",
+    doc_id="python-basics-001"  # Optional unique ID
+)
+```
+
+```python Query knowledge
+# Query with optional topic filter
+context = await rag.query(
+    question="How do I use async/await?",
+    topic="python",  # Optional: filter to specific topic
+    k=5  # Number of results to return
+)
+
+print(context)  # Concatenated relevant chunks
+```
+
+```python List topics
+# Get all learned topics
+topics = rag.list_topics()
+
+# Returns:
+# [
+#   {"topic": "python", "chunks_count": 12},
+#   {"topic": "machine-learning", "chunks_count": 8}
+# ]
+```
+
+```python Delete topic
+# Remove all knowledge for a topic
+deleted_count = rag.delete_topic("python")
+print(f"Deleted {deleted_count} chunks")
+```
+</CodeGroup>
+
+### Embedding Process
+
+```python
+# Ollama embedding via HTTP API
+POST http://localhost:11434/api/embed
+{
+  "model": "nomic-embed-text",
+  "input": "text to embed"
+}
+
+# Returns 768-dimensional vector
+{
+  "embeddings": [[0.123, -0.456, ...]]  # 768 floats
+}
+```
+
+### Hybrid Search Algorithm
+
+```python
+def _merge_hybrid(
+    vector_results: list[dict],
+    keyword_results: list[dict],
+    vector_weight: float = 0.7,
+    keyword_weight: float = 0.3,
+) -> list[str]:
+    """Merge vector and keyword results with weighted scoring."""
+    scored = {}  # text_hash -> weighted_score
+    
+    # Add vector scores (weighted 70%)
+    for r in vector_results:
+        hash = md5(r["text"])
+        scored[hash] = r["score"] * 0.7
+    
+    # Add keyword scores (weighted 30%)
+    for r in keyword_results:
+        hash = md5(r["text"])
+        scored[hash] = scored.get(hash, 0) + r["score"] * 0.3
+    
+    # Sort by combined score
+    return sorted(scored.items(), key=lambda x: x[1], reverse=True)
+```
+
+## RAG Status & Diagnostics
+
+Check if the RAG system is properly configured:
+
+<CodeGroup>
+```python Check status
+from app.rag.service import check_rag_status
+
+status = await check_rag_status()
+
+# Returns:
+# {
+#   "ok": true,
+#   "message": "RAG ready. Learn content below or ask in Chat.",
+#   "provider": "Ollama",
+#   "ollama_url": "http://localhost:11434",
+#   "ollama_reason": "ok",
+#   "ollama_ok": true
+# }
+```
+
+```python Check Ollama
+from app.rag.service import check_ollama_at_url
+
+result = check_ollama_at_url("http://localhost:11434")
+
+# Possible reasons:
+# - "ok": Everything working
+# - "not_running": Ollama not accessible
+# - "model_missing": Run 'ollama pull nomic-embed-text'
+# - "wrong_config": Invalid embedding dimensions
+# - "unknown": Other error
+```
+</CodeGroup>
+
+## Advanced Configuration
+
+### Chunking Strategy
+
+```python
+# Default: 500 character chunks with no overlap
+chunks = [text[i:i+500] for i in range(0, len(text), 500)]
+```
+
+To customize chunking, modify `RAGService.add()` in `backend/app/rag/service.py`.
+
+### Search Weights
+
+Adjust the hybrid search weights:
+
+```python
+# Default: 70% vector, 30% keyword
+context = await rag.query(
+    question="...",
+    vector_weight=0.8,  # Increase vector importance
+    keyword_weight=0.2
+)
+```
+
+### Collection Settings
+
+```python
+# ChromaDB configuration in RAGService.__init__()
+self._coll = self._client.get_or_create_collection(
+    "asta_rag",
+    metadata={"hnsw:space": "cosine"}  # Cosine similarity
+)
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Learn focused topics">
+    Create specific topics rather than generic ones:
+    - ✅ `learn about Python async/await`
+    - ✅ `learn about our GraphQL API schema`
+    - ❌ `learn about programming` (too broad)
+  </Step>
+
+  <Step title="Use descriptive topic names">
+    Topic names are case-insensitive and normalized:
+    - `Python` → `python`
+    - `Machine Learning` → `machine learning`
+    - Use consistent naming for related topics
+  </Step>
+
+  <Step title="Provide context-rich content">
+    Better source material leads to better retrieval:
+    - Include examples and explanations
+    - Add relevant keywords naturally
+    - Structure content clearly
+  </Step>
+
+  <Step title="Manage knowledge base size">
+    Monitor and clean up old topics:
+    - List topics regularly
+    - Delete outdated information
+    - Update changed topics rather than appending
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Ollama connection issues
+
+**Error**: `Cannot reach Ollama at http://localhost:11434`
+
+**Solutions**:
+- Check if Ollama is running: `ollama serve`
+- Verify port with: `curl http://localhost:11434/api/tags`
+- Set correct URL: `export OLLAMA_BASE_URL="http://your-host:11434"`
+
+### Model not found
+
+**Error**: `Model not found. Run: ollama pull nomic-embed-text`
+
+**Solution**:
+```bash
+# Pull the required model
+ollama pull nomic-embed-text
+
+# Verify it's installed
+ollama list
+```
+
+### ChromaDB errors
+
+**Error**: `RAG store failed: ...`
+
+**Solutions**:
+- Check disk space for ChromaDB directory
+- Verify write permissions: `ls -la ~/workspace/source/backend/chroma_db/`
+- Delete and reinitialize: `rm -rf ~/workspace/source/backend/chroma_db/`
+
+### Poor search results
+
+**Issues**:
+- Irrelevant chunks returned
+- Missing obvious matches
+
+**Solutions**:
+- Add more context when learning (longer, detailed content)
+- Use more specific queries
+- Adjust search weights (increase keyword_weight for exact matches)
+- Verify topic names match (case-insensitive)
+
+## Performance Considerations
+
+- **Embedding time**: ~100-500ms per chunk (depends on Ollama performance)
+- **Query time**: ~50-200ms for hybrid search (5 results)
+- **Storage**: ~3KB per 500-character chunk (embeddings + metadata)
+- **Memory**: ChromaDB loads indices into memory for fast querying
+
+<Note>
+  For large knowledge bases (>10,000 chunks), consider running Ollama on a dedicated GPU server and setting `OLLAMA_BASE_URL` to the remote endpoint.
+</Note>

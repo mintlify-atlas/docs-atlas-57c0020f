@@ -1,0 +1,234 @@
+---
+title: Environment Variables
+description: Configure Asta's backend with environment variables
+---
+
+Asta uses environment variables to configure API keys, security settings, and runtime behavior. All configuration happens in `backend/.env`.
+
+## Setup
+
+1. Copy the example file:
+   ```bash
+   cp .env.example backend/.env
+   ```
+
+2. Edit `backend/.env` with your values
+
+3. Restart the backend for changes to take effect
+
+<Note>
+  `backend/.env` is in `.gitignore` and never committed. Only `.env.example` is tracked in git.
+</Note>
+
+## AI Providers
+
+Configure one or more AI providers. Asta falls back through the provider chain (Claude → Ollama → OpenRouter) if a provider fails.
+
+<ParamField path="GROQ_API_KEY" type="string">
+  Groq API key for fast inference. Get one at [console.groq.com](https://console.groq.com)
+</ParamField>
+
+<ParamField path="GEMINI_API_KEY" type="string">
+  Google Gemini API key (also accepts `GOOGLE_AI_KEY`). Get one at [aistudio.google.com](https://aistudio.google.com)
+</ParamField>
+
+<ParamField path="ANTHROPIC_API_KEY" type="string">
+  Anthropic Claude API key. Required for Claude provider. Get one at [console.anthropic.com](https://console.anthropic.com)
+</ParamField>
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  OpenAI API key. Get one at [platform.openai.com](https://platform.openai.com/api-keys)
+</ParamField>
+
+<ParamField path="OPENROUTER_API_KEY" type="string">
+  OpenRouter API key (access to 300+ models). Get one at [openrouter.ai/keys](https://openrouter.ai/keys)
+</ParamField>
+
+<ParamField path="HUGGINGFACE_API_KEY" type="string">
+  Hugging Face API token for image generation fallback (FLUX.1-dev). Get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+</ParamField>
+
+<ParamField path="OLLAMA_BASE_URL" type="string" default="http://localhost:11434">
+  Ollama server URL for local models
+</ParamField>
+
+## Channels
+
+<ParamField path="TELEGRAM_BOT_TOKEN" type="string">
+  Telegram bot token from [@BotFather](https://t.me/botfather)
+</ParamField>
+
+<ParamField path="ASTA_TELEGRAM_ALLOWED_IDS" type="string">
+  Comma-separated numeric Telegram user IDs allowed to use the bot. Empty = allow all.
+  
+  Example: `6168747695,1234567890`
+</ParamField>
+
+## Workspace
+
+<ParamField path="ASTA_WORKSPACE_DIR" type="string">
+  Path to OpenClaw-style workspace directory (contains `AGENTS.md`, `USER.md`, `TOOLS.md`, `SOUL.md`, and `skills/`).
+  
+  If empty, Asta uses `workspace/` at project root and creates it automatically.
+</ParamField>
+
+## Security
+
+<ParamField path="ASTA_ALLOWED_PATHS" type="string">
+  Comma-separated allowed directories for file access. No trailing slashes.
+  
+  Example: `/Users/you/Documents,/Users/you/notes`
+</ParamField>
+
+<ParamField path="ASTA_EXEC_ALLOWED_BINS" type="string">
+  Comma-separated binary names Asta can run (e.g. `memo,things`). Empty = exec disabled.
+  
+  Skills that need a binary show install steps on the Skills page and auto-add the bin when enabled.
+</ParamField>
+
+<ParamField path="ASTA_EXEC_SECURITY" type="string" default="allowlist">
+  Exec security mode:
+  - `allowlist` (default): only allowlisted bins can run
+  - `full`: allow any command (dangerous; use only if you trust the agent)
+  - `deny`: disable exec completely
+</ParamField>
+
+<ParamField path="ASTA_API_TOKEN" type="string">
+  API bearer token for remote access (e.g. via Cloudflare Tunnel). Empty = no auth required.
+</ParamField>
+
+<ParamField path="ASTA_CORS_ORIGINS" type="string">
+  Comma-separated extra CORS origins for LAN or Tailscale access.
+  
+  Example: `http://192.168.1.113:5174,http://100.x.x.x:5173`
+</ParamField>
+
+## Subagents
+
+<ParamField path="ASTA_SUBAGENTS_AUTO_SPAWN" type="boolean" default="true">
+  Automatically spawn background subagent runs for explicit/complex long-task prompts
+</ParamField>
+
+<ParamField path="ASTA_SUBAGENTS_MAX_CONCURRENT" type="number" default="3">
+  Max concurrent running child sessions
+</ParamField>
+
+<ParamField path="ASTA_SUBAGENTS_MAX_DEPTH" type="number" default="1">
+  Max nesting depth (1 = no nested subagents)
+</ParamField>
+
+<ParamField path="ASTA_SUBAGENTS_MAX_CHILDREN" type="number" default="5">
+  Max concurrent children per parent run
+</ParamField>
+
+<ParamField path="ASTA_SUBAGENTS_ARCHIVE_AFTER_MINUTES" type="number" default="60">
+  Auto-archive keep-mode child sessions after N minutes (0 disables)
+</ParamField>
+
+## Vision
+
+<ParamField path="ASTA_VISION_PREPROCESS" type="boolean" default="true">
+  - `true` (default): analyze image with a vision model first, then pass analysis to the main agent model
+  - `false`: skip preprocessor and send image directly only when the selected provider supports vision
+</ParamField>
+
+<ParamField path="ASTA_VISION_PROVIDER_ORDER" type="string" default="openrouter,claude,openai">
+  Comma-separated vision provider order (first configured key wins)
+</ParamField>
+
+<ParamField path="ASTA_VISION_OPENROUTER_MODEL" type="string" default="nvidia/nemotron-nano-12b-v2-vl:free">
+  OpenRouter vision model used by preprocessor (default is free Nemotron VL)
+</ParamField>
+
+## Voice Calls (Pingram)
+
+<ParamField path="ASTA_OWNER_PHONE_NUMBER" type="string">
+  Your phone number for voice reminders (E.164 format: `+15551234567`)
+</ParamField>
+
+<ParamField path="ASTA_PINGRAM_CLIENT_ID" type="string">
+  Pingram client ID from [app.notificationapi.com](https://app.notificationapi.com)
+</ParamField>
+
+<ParamField path="ASTA_PINGRAM_CLIENT_SECRET" type="string">
+  Pingram client secret
+</ParamField>
+
+<ParamField path="ASTA_PINGRAM_API_KEY" type="string">
+  Optional API key from Pingram dashboard (used as Bearer for sender)
+</ParamField>
+
+<ParamField path="ASTA_PINGRAM_NOTIFICATION_ID" type="string" default="cron_alert">
+  Notification template ID in Pingram
+</ParamField>
+
+<ParamField path="ASTA_PINGRAM_TEMPLATE_ID" type="string">
+  Template ID for voice calls
+</ParamField>
+
+## Memory & Search
+
+<ParamField path="ASTA_MEMORY_SEARCH_MODE" type="string" default="search">
+  Memory search mode:
+  - `search` (default): fast lexical-first, with RAG fallback only when no local hit
+  - `hybrid`: lexical + RAG on every query
+</ParamField>
+
+## Debug & Developer
+
+<ParamField path="DEBUG" type="boolean" default="false">
+  Enable debug logging
+</ParamField>
+
+<ParamField path="ASTA_DB_PATH" type="string" default="./asta.db">
+  SQLite database path
+</ParamField>
+
+<ParamField path="ASTA_CHROMA_PATH" type="string" default="./chroma_db">
+  ChromaDB path for RAG memory
+</ParamField>
+
+<ParamField path="ASTA_SHOW_TOOL_TRACE" type="boolean" default="false">
+  Show tool usage at the bottom of assistant replies (debugging)
+</ParamField>
+
+<ParamField path="ASTA_TOOL_TRACE_CHANNELS" type="string" default="web">
+  Channels for the trace (comma-separated), e.g. `web,telegram`
+</ParamField>
+
+## Example Configuration
+
+```bash
+# AI providers
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENROUTER_API_KEY=sk-or-v1-...
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Channels
+TELEGRAM_BOT_TOKEN=1234567890:ABC...
+ASTA_TELEGRAM_ALLOWED_IDS=6168747695
+
+# Security
+ASTA_ALLOWED_PATHS=/Users/you/Documents,/Users/you/notes
+ASTA_EXEC_ALLOWED_BINS=memo,things
+ASTA_EXEC_SECURITY=allowlist
+
+# Workspace
+ASTA_WORKSPACE_DIR=/Users/you/asta-workspace
+
+# Debug
+DEBUG=false
+ASTA_SHOW_TOOL_TRACE=false
+```
+
+<Note>
+  Changes to environment variables require a backend restart to take effect.
+</Note>
+
+## Configuration File Location
+
+The configuration logic is defined in `backend/app/config.py`. This file:
+- Loads variables from `backend/.env`
+- Provides type-safe settings via the `Settings` Pydantic model
+- Handles defaults and validation
+- Exposes settings via `get_settings()`

@@ -1,0 +1,723 @@
+---
+title: Multi-User Authentication
+description: JWT-based authentication with role-based access control
+icon: users
+---
+
+Asta supports **multi-user authentication** with JWT tokens and role-based access control (RBAC). This page explains the authentication system, user roles, and how to manage users.
+
+## Overview
+
+<Card title="Dual Authentication Modes" icon="shield-halved">
+  Asta automatically switches between single-user and multi-user modes:
+  
+  - **Single-user mode:** No users in database → Legacy Bearer token or open access
+  - **Multi-user mode:** Users exist → JWT authentication with roles
+</Card>
+
+## Authentication Flow
+
+### Multi-User Mode (JWT)
+
+When users exist in the database:
+
+<Steps>
+  <Step title="User Registration">
+    New users self-register via the login page:
+    ```bash
+    POST /api/auth/register
+    {
+      "username": "alice",
+      "password": "secure_password"
+    }
+    ```
+    
+    - Creates user with `user` role (non-admin)
+    - Password hashed with bcrypt
+    - Returns user object (no token yet)
+  </Step>
+
+  <Step title="Login">
+    Users authenticate to receive JWT:
+    ```bash
+    POST /api/auth/login
+    {
+      "username": "alice",
+      "password": "secure_password"
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "access_token": "eyJhbGciOiJIUzI1NiIs...",
+      "user": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "username": "alice",
+        "role": "user"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Request Authentication">
+    Include JWT in requests:
+    
+    **Authorization Header:**
+    ```http
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+    ```
+    
+    **Or Query Parameter:**
+    ```http
+    GET /api/chat/conversations?token=eyJhbGciOiJIUzI1NiIs...
+    ```
+  </Step>
+
+  <Step title="Token Validation">
+    `AuthMiddleware` validates the JWT:
+    - Decodes token and verifies signature
+    - Extracts `user_id`, `username`, `role`
+    - Sets `request.state.user_id`, `request.state.user_role`
+    - Rejects invalid/expired tokens with 401
+  </Step>
+</Steps>
+
+### Single-User Mode (Legacy)
+
+When no users exist in the database:
+
+<Steps>
+  <Step title="Check for Token">
+    Asta checks for `ASTA_API_TOKEN` in environment:
+    ```bash
+    # backend/.env
+    ASTA_API_TOKEN=your_secret_token
+    ```
+  </Step>
+
+  <Step title="Local Access">
+    Requests from localhost (`127.0.0.1`, `::1`) skip auth automatically
+  </Step>
+
+  <Step title="Remote Access">
+    Remote requests (e.g., via Cloudflare Tunnel) must provide Bearer token:
+    ```http
+    Authorization: Bearer your_secret_token
+    ```
+  </Step>
+
+  <Step title="Open Access">
+    If no `ASTA_API_TOKEN` is set, all requests allowed (local dev)
+  </Step>
+</Steps>
+
+## User Roles
+
+<Tabs>
+  <Tab title="Admin">
+    ### Admin Role
+    
+    **Permissions:**
+    - ✅ Full access to all features
+    - ✅ Create, edit, delete users
+    - ✅ Access all settings tabs
+    - ✅ Configure API keys and integrations
+    - ✅ Manage skills, agents, cron jobs
+    - ✅ Execute any command (exec tool)
+    - ✅ Access all files and directories
+    - ✅ View system status and logs
+    
+    **UI Access:**
+    - General (full)
+    - Memories
+    - Keys
+    - Models
+    - Permissions
+    - Skills
+    - Agents
+    - Channels
+    - Cron
+    - Google
+    - Spotify
+    - Network
+    - Knowledge
+    - About
+    
+    **How to create:**
+    ```bash
+    # First user is always admin
+    POST /api/auth/register
+    {
+      "username": "admin",
+      "password": "secure_admin_pass"
+    }
+    ```
+  </Tab>
+
+  <Tab title="User">
+    ### User Role
+    
+    **Permissions:**
+    - ✅ Chat access with safe tools
+    - ✅ View own conversations
+    - ✅ Update own profile and memories
+    - ✅ Use enabled skills (web search, weather, math, GIFs)
+    - ⛔ Cannot create/manage other users
+    - ⛔ Cannot access sensitive settings
+    - ⛔ Cannot execute arbitrary commands
+    - ⛔ Cannot configure API keys
+    - ⛔ Limited agent access
+    
+    **UI Access:**
+    - General (limited: thinking, reasoning, mood)
+    - Memories (own USER.md only)
+    - About
+    
+    **Restrictions:**
+    - Exec tool limited to safe commands only
+    - File access restricted to own workspace
+    - No access to system settings
+    - Cannot view other users' data
+    
+    **How to create:**
+    ```bash
+    # Self-registration creates user role
+    POST /api/auth/register
+    {
+      "username": "alice",
+      "password": "user_password"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### JWT Token Structure
+
+**Payload:**
+```json
+{
+  "sub": "550e8400-e29b-41d4-a716-446655440000",  // user_id
+  "username": "alice",
+  "role": "user",
+  "exp": 1735689600  // Expiry (30 days)
+}
+```
+
+**Signing** (`backend/app/auth_utils.py`):
+```python
+import jwt
+from datetime import datetime, timedelta
+from app.config import get_settings
+
+def create_jwt(user_id: str, username: str, role: str) -> str:
+    """Create JWT token valid for 30 days."""
+    payload = {
+        "sub": user_id,
+        "username": username,
+        "role": role,
+        "exp": datetime.utcnow() + timedelta(days=30),
+    }
+    return jwt.encode(payload, get_settings().jwt_secret_key, algorithm="HS256")
+```
+
+**Validation:**
+```python
+def decode_jwt(token: str) -> dict | None:
+    """Decode and validate JWT. Returns None if invalid/expired."""
+    try:
+        return jwt.decode(
+            token,
+            get_settings().jwt_secret_key,
+            algorithms=["HS256"],
+        )
+    except jwt.ExpiredSignatureError:
+        return None  # Token expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
+```
+
+### AuthMiddleware
+
+**Location:** `backend/app/auth_middleware.py`
+
+<Accordion title="Full Middleware Implementation">
+```python
+class AuthMiddleware(BaseHTTPMiddleware):
+    """JWT auth when users exist; legacy Bearer token fallback otherwise."""
+
+    async def dispatch(self, request: Request, call_next):
+        # Always allow CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # Always allow public paths
+        if request.url.path in _PUBLIC_PATHS:
+            return await call_next(request)
+
+        multi_user = await _check_multi_user()
+
+        if multi_user:
+            return await self._jwt_auth(request, call_next)
+        else:
+            return await self._legacy_bearer_auth(request, call_next)
+
+    async def _jwt_auth(self, request: Request, call_next):
+        """Multi-user JWT mode."""
+        from app.auth_utils import decode_jwt
+
+        token = self._extract_token(request)
+        if not token:
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+        payload = decode_jwt(token)
+        if not payload:
+            return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
+
+        request.state.user_id = payload.get("sub", "")
+        request.state.user_role = payload.get("role", "user")
+        request.state.username = payload.get("username", "")
+        return await call_next(request)
+
+    async def _legacy_bearer_auth(self, request: Request, call_next):
+        """No users → single-user mode with optional Bearer token."""
+        from app.config import get_settings
+
+        token = (get_settings().asta_api_token or "").strip()
+
+        # No token configured → open access
+        if not token:
+            request.state.user_id = "default"
+            request.state.user_role = "admin"
+            request.state.username = "admin"
+            return await call_next(request)
+
+        # Local requests skip auth
+        client_host = request.client.host if request.client else ""
+        if client_host in ("127.0.0.1", "::1", "localhost"):
+            request.state.user_id = "default"
+            request.state.user_role = "admin"
+            request.state.username = "admin"
+            return await call_next(request)
+
+        # Check Bearer token
+        provided = self._extract_bearer(request)
+        if provided and provided == token:
+            request.state.user_id = "default"
+            request.state.user_role = "admin"
+            request.state.username = "admin"
+            return await call_next(request)
+
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+```
+</Accordion>
+
+### Role-Based Access Control
+
+**Helper Functions** (`backend/app/auth_utils.py`):
+
+```python
+def get_current_user_id(request: Request) -> str:
+    """Extract user_id from request state."""
+    return getattr(request.state, "user_id", "default")
+
+def get_current_user_role(request: Request) -> str:
+    """Extract user role from request state."""
+    return getattr(request.state, "user_role", "user")
+
+def require_admin(request: Request) -> None:
+    """Raise 403 if user is not admin."""
+    if get_current_user_role(request) != "admin":
+        raise HTTPException(403, "Admin access required")
+```
+
+**Usage in Endpoints:**
+
+```python
+from app.auth_utils import require_admin, get_current_user_id
+
+@router.post("/settings/keys")
+async def update_keys(request: Request, body: KeysUpdate):
+    require_admin(request)  # Only admin can update keys
+    user_id = get_current_user_id(request)
+    # ... rest of endpoint
+```
+
+### Per-User Data Isolation
+
+**User Memories:**
+```
+workspace/
+├── USER.md                      # Global (single-user mode)
+└── users/
+    ├── user-a-uuid/
+    │   └── USER.md              # User A's memories
+    └── user-b-uuid/
+        └── USER.md              # User B's memories
+```
+
+**Database Queries:**
+```python
+# All queries scoped by user_id
+await db.get_conversations(user_id)
+await db.get_user_settings(user_id)
+await db.get_skill_toggles(user_id)
+await db.get_provider_runtime_states(user_id, providers)
+```
+
+## User Management API
+
+<Tabs>
+  <Tab title="Authentication">
+    ### POST /api/auth/login
+    
+    Login with username and password.
+    
+    **Request:**
+    ```json
+    {
+      "username": "alice",
+      "password": "secure_password"
+    }
+    ```
+    
+    **Response (200):**
+    ```json
+    {
+      "access_token": "eyJhbGciOiJIUzI1NiIs...",
+      "user": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "username": "alice",
+        "role": "user"
+      }
+    }
+    ```
+    
+    **Error (401):**
+    ```json
+    {"detail": "Invalid username or password"}
+    ```
+
+    ---
+
+    ### POST /api/auth/register
+    
+    Self-registration (creates non-admin user).
+    
+    **Request:**
+    ```json
+    {
+      "username": "bob",
+      "password": "bob_password"
+    }
+    ```
+    
+    **Response (200):**
+    ```json
+    {
+      "user": {
+        "id": "660e8400-e29b-41d4-a716-446655440000",
+        "username": "bob",
+        "role": "user"
+      }
+    }
+    ```
+    
+    **Errors:**
+    - `403` - Registration not available (no existing users)
+    - `409` - Username already exists
+    - `400` - Invalid username/password (too short)
+
+    ---
+
+    ### GET /api/auth/me
+    
+    Get current authenticated user.
+    
+    **Response:**
+    ```json
+    {
+      "user_id": "550e8400-e29b-41d4-a716-446655440000",
+      "username": "alice",
+      "role": "user"
+    }
+    ```
+  </Tab>
+
+  <Tab title="User Management (Admin)">
+    ### GET /api/auth/users
+    
+    List all users (admin only).
+    
+    **Response:**
+    ```json
+    {
+      "users": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "username": "admin",
+          "role": "admin",
+          "created_at": "2024-01-15T10:30:00Z"
+        },
+        {
+          "id": "660e8400-e29b-41d4-a716-446655440000",
+          "username": "alice",
+          "role": "user",
+          "created_at": "2024-02-20T14:22:00Z"
+        }
+      ]
+    }
+    ```
+
+    ---
+
+    ### POST /api/auth/users
+    
+    Create new user (admin only).
+    
+    **Request:**
+    ```json
+    {
+      "username": "charlie",
+      "password": "charlie_pass",
+      "role": "user"  // or "admin"
+    }
+    ```
+    
+    **Response (200):**
+    ```json
+    {
+      "user": {
+        "id": "770e8400-e29b-41d4-a716-446655440000",
+        "username": "charlie",
+        "role": "user"
+      }
+    }
+    ```
+
+    ---
+
+    ### PATCH /api/auth/users/{user_id}
+    
+    Update user (admin only).
+    
+    **Request:**
+    ```json
+    {
+      "role": "admin"  // Promote to admin
+    }
+    ```
+
+    ---
+
+    ### DELETE /api/auth/users/{user_id}
+    
+    Delete user (admin only).
+    
+    **Response (200):**
+    ```json
+    {"message": "User deleted"}
+    ```
+  </Tab>
+
+  <Tab title="Password Management">
+    ### POST /api/auth/change-password
+    
+    Change own password (authenticated users).
+    
+    **Request:**
+    ```json
+    {
+      "current_password": "old_password",
+      "new_password": "new_secure_password"
+    }
+    ```
+    
+    **Response (200):**
+    ```json
+    {"message": "Password changed successfully"}
+    ```
+    
+    **Error (401):**
+    ```json
+    {"detail": "Current password is incorrect"}
+    ```
+
+    ---
+
+    ### POST /api/auth/users/{user_id}/reset-password
+    
+    Reset another user's password (admin only).
+    
+    **Request:**
+    ```json
+    {
+      "new_password": "temporary_password"
+    }
+    ```
+    
+    **Response (200):**
+    ```json
+    {"message": "Password reset successfully"}
+    ```
+  </Tab>
+</Tabs>
+
+## Security Considerations
+
+<CardGroup cols={2}>
+  <Card title="Password Security" icon="lock">
+    - Passwords hashed with bcrypt (cost factor 12)
+    - Minimum 4 characters (configurable)
+    - Never stored or logged in plaintext
+    - Secure comparison prevents timing attacks
+  </Card>
+
+  <Card title="JWT Security" icon="key">
+    - Signed with HS256 algorithm
+    - 30-day expiry (configurable)
+    - Secret key from `JWT_SECRET_KEY` env var
+    - Invalidation on server restart if secret changes
+  </Card>
+
+  <Card title="CORS Protection" icon="shield">
+    - CORS middleware wraps auth
+    - Proper preflight handling
+    - 401 responses include CORS headers
+    - Configurable allowed origins
+  </Card>
+
+  <Card title="Rate Limiting" icon="gauge">
+    - Consider adding rate limiting for login endpoint
+    - Prevent brute force attacks
+    - IP-based or user-based limits
+    - (Currently not implemented - TODO)
+  </Card>
+</CardGroup>
+
+<Warning>
+**Security Best Practices:**
+- Set strong `JWT_SECRET_KEY` in production (32+ random bytes)
+- Use HTTPS in production (Cloudflare Tunnel recommended)
+- Regularly rotate JWT secret if compromised
+- Monitor failed login attempts
+- Implement account lockout after N failed attempts
+</Warning>
+
+## Migration from Single-User to Multi-User
+
+<Steps>
+  <Step title="Backup Workspace">
+    ```bash
+    cp -r workspace workspace.backup
+    cp backend/asta.db backend/asta.db.backup
+    ```
+  </Step>
+
+  <Step title="Create First Admin User">
+    ```bash
+    curl -X POST http://localhost:8000/api/auth/register \
+      -H "Content-Type: application/json" \
+      -d '{"username": "admin", "password": "admin_password"}'
+    ```
+    
+    First registered user automatically becomes admin.
+  </Step>
+
+  <Step title="Migrate USER.md">
+    Default user's `workspace/USER.md` is automatically used for user "default" in single-user mode.
+    
+    For multi-user:
+    ```bash
+    # Create per-user directory
+    mkdir -p workspace/users/<admin-user-id>/
+    
+    # Copy USER.md
+    cp workspace/USER.md workspace/users/<admin-user-id>/USER.md
+    ```
+  </Step>
+
+  <Step title="Update Environment">
+    Remove `ASTA_API_TOKEN` from `.env` (no longer used in multi-user mode):
+    ```bash
+    # backend/.env
+    # ASTA_API_TOKEN=...  # Remove this line
+    ```
+  </Step>
+
+  <Step title="Restart Asta">
+    ```bash
+    ./asta.sh restart
+    ```
+    
+    Middleware automatically detects multi-user mode and switches to JWT auth.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="401 Unauthorized on all requests">
+    **In multi-user mode:**
+    - Ensure you're sending valid JWT token
+    - Check token hasn't expired (30 days)
+    - Verify `JWT_SECRET_KEY` hasn't changed
+    - Try logging in again to get fresh token
+
+    **In single-user mode:**
+    - Check if `ASTA_API_TOKEN` is set in `.env`
+    - Verify token matches what you're sending
+    - Confirm request is from localhost or includes token
+  </Accordion>
+
+  <Accordion title="Can't create users">
+    **If registration fails with 403:**
+    - No users exist yet (database empty)
+    - First user must be created directly in database or via special setup
+
+    **If registration fails with 409:**
+    - Username already taken
+    - Try a different username
+  </Accordion>
+
+  <Accordion title="Lost admin access">
+    **Database fix:**
+    ```bash
+    # Promote user to admin
+    sqlite3 backend/asta.db "UPDATE users SET role='admin' WHERE username='alice';"
+    
+    # Restart Asta
+    ./asta.sh restart
+    ```
+  </Accordion>
+
+  <Accordion title="Token expired immediately">
+    **Check system time:**
+    - JWT expiry uses UTC time
+    - Ensure system clock is correct
+    - Check `exp` claim in JWT:
+      ```bash
+      # Decode JWT (without verification)
+      echo 'eyJhbGc...' | base64 -d
+      ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" href="/concepts/architecture" icon="sitemap">
+    Understand how auth fits into Asta's architecture
+  </Card>
+  <Card title="API Reference" href="/api/authentication" icon="code">
+    Full authentication API documentation
+  </Card>
+  <Card title="Quickstart" href="/quickstart" icon="rocket">
+    Get started with setting up your first user
+  </Card>
+  <Card title="Security" href="/docs/SECURITY" icon="shield">
+    Security best practices and guidelines
+  </Card>
+</CardGroup>

@@ -1,0 +1,99 @@
+---
+title: Introduction
+description: A personal AI workspace with cross-platform desktop app, multi-provider AI support, Telegram integration, and persistent context management.
+---
+
+# Welcome to Asta
+
+Asta is a **personal AI control plane** that runs on desktop (macOS/Windows) and Telegram with one shared context, persistent chat history, and multi-user support.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes
+  </Card>
+  <Card title="Desktop App" icon="window" href="/desktop/overview">
+    Cross-platform Tauri app with global shortcut
+  </Card>
+  <Card title="AI Providers" icon="brain" href="/concepts/ai-providers">
+    Claude, Google, OpenAI, Groq, OpenRouter, Ollama
+  </Card>
+  <Card title="Skills System" icon="wand-magic-sparkles" href="/concepts/skills-system">
+    OpenClaw-style on-demand skill loading
+  </Card>
+</CardGroup>
+
+## Why Asta?
+
+<CardGroup cols={2}>
+  <Card title="Cross-Platform Desktop" icon="desktop">
+    Tauri-based app for macOS and Windows with sidebar conversation history, agent picker, PDF generation, and Tailscale remote access. Global shortcut `Alt+Space` to toggle.
+  </Card>
+  <Card title="Multi-User Authentication" icon="users">
+    JWT-based login with admin/user roles, self-registration, and per-user memories. Role-based access control across all endpoints and tools.
+  </Card>
+  <Card title="Multi-Provider AI" icon="microchip">
+    Support for Groq, Google Gemini, Claude, OpenAI, OpenRouter, and Ollama with intelligent provider fallback.
+  </Card>
+  <Card title="OpenClaw-Style Skills" icon="code">
+    Model selects the best workspace skill and reads its `SKILL.md` on demand. Clear split between built-in Python skills and workspace custom skills.
+  </Card>
+  <Card title="Unified Memory" icon="database">
+    Persistent chat history per session, allowed local files, learned knowledge (RAG), and channel history.
+  </Card>
+  <Card title="Native Setup" icon="circle-check">
+    No Docker required. Python 3.12/3.13 backend with FastAPI and Node 18+ for the desktop app.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+- **Cross-platform desktop app** — Tauri v2 with sidebar, agent picker, file drag-and-drop, and PDF generation
+- **Multi-provider AI** — Claude, Google Gemini, OpenAI, Groq, OpenRouter, and Ollama
+- **Telegram integration** — Long polling bot with inline approvals and command support
+- **Vision pipeline** — Hybrid preprocessing with native support for Claude, Google, and OpenAI
+- **Audio transcription** — Meeting notes and voice memos with faster-whisper
+- **RAG/Learning** — "Learn about X for Y minutes" with Ollama embeddings and Chroma
+- **Reminders & Cron** — Time-based tasks with Pingram voice call integration
+- **Spotify control** — Search, play, and device selection with OAuth
+- **Google Workspace** — Gmail, Calendar, Drive via gog CLI
+- **Subagent orchestration** — Background task execution with isolated conversations
+
+## Built-In Skills
+
+Asta includes several built-in skills for common tasks:
+
+- **Time & Weather** — Current time, timezone lookup, and weather forecasts
+- **Web Search** — DuckDuckGo search integration
+- **Spotify** — Music search, playback, and device control
+- **Reminders** — Natural language reminder creation with voice call support
+- **Audio Notes** — Transcribe and format audio recordings
+- **PDF Generation** — Create downloadable PDFs directly in chat
+- **Background Learning** — Research topics and build retrievable knowledge
+- **Google Workspace** — Gmail, Calendar, and Drive integration via gog CLI
+
+## Automated Releases
+
+GitHub Actions automatically builds macOS (DMG) and Windows (MSI) on version tags, published to [GitHub Releases](https://github.com/helloworldxdwastaken/asta/releases).
+
+## Requirements
+
+- **Backend:** Python 3.12 or 3.13 (Python 3.14 not yet supported due to pydantic/ChromaDB compatibility)
+- **Desktop App:** Node 18+ and Rust toolchain for Tauri
+- **Optional:** Ollama for local AI and RAG embeddings (`ollama pull nomic-embed-text`)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Full setup instructions for Linux, macOS, and Windows
+  </Card>
+  <Card title="Architecture Overview" icon="diagram-project" href="/concepts/architecture">
+    Understand how Asta is built
+  </Card>
+  <Card title="Creating Skills" icon="file-code" href="/guides/creating-skills">
+    Build custom workspace skills
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Explore the REST API
+  </Card>
+</CardGroup>

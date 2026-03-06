@@ -1,0 +1,244 @@
+---
+title: Skills
+description: Enable, disable, and manage Asta's skills
+---
+
+Skills are modular capabilities that Asta can use. You can toggle them on/off in Settings, and some require dependencies or API keys.
+
+## Managing Skills
+
+### Settings UI
+
+1. Open Asta
+2. Go to **Settings** → **Skills**
+3. Toggle skills on/off with the switch next to each skill
+4. Skills with missing dependencies show an action hint (e.g. "Install & enable exec")
+
+### Skill Status
+
+Each skill shows:
+- **Name** and **description**
+- **Enabled** (toggle on/off)
+- **Available** (whether dependencies are met)
+- **Action hint** (what's needed to make it available)
+
+## Built-in Skills
+
+### Files
+**Description:** Local file access and summaries
+
+**Requirements:**
+- Configured allowed paths in `ASTA_ALLOWED_PATHS` or workspace
+
+**How to enable:**
+```bash
+# In backend/.env
+ASTA_ALLOWED_PATHS=/Users/you/Documents,/Users/you/notes
+```
+
+### Google Drive
+**Description:** Drive files and summaries
+
+**Status:** OAuth not wired yet (stub only)
+
+### Learning (RAG)
+**Description:** Learned knowledge and documents
+
+**Requirements:**
+- Ollama running locally
+
+**How to enable:**
+1. Install Ollama: [ollama.com](https://ollama.com)
+2. Start Ollama: `ollama serve`
+3. Pull a model: `ollama pull llama3.3`
+
+### Time
+**Description:** Current time (12h AM/PM). Uses location for timezone.
+
+**Requirements:** None (always available)
+
+### Weather
+**Description:** Current weather and forecast
+
+**Requirements:** Location set in `workspace/USER.md`
+
+### Google Search
+**Description:** Search the web for current information
+
+**Requirements:** None (always available)
+
+### Lyrics
+**Description:** Find song lyrics
+
+**Requirements:** None (free, no API key needed)
+
+### Spotify
+**Description:** Search songs and control playback
+
+**Requirements:**
+- Spotify Client ID and Secret (see [API Keys](/configuration/api-keys#spotify))
+
+**How to enable:**
+1. Create Spotify app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+2. Add credentials in Settings → Spotify
+3. For playback: click **Connect Account**
+
+### Reminders
+**Description:** Wake me up or remind me at a time
+
+**Requirements:**
+- Location set in `workspace/USER.md` for timezone
+- (Optional) Pingram for voice calls
+
+### Audio Notes
+**Description:** Upload audio; Asta transcribes and formats as meeting notes
+
+**Requirements:** None (runs locally, no API key)
+
+### Silly GIF
+**Description:** Occasionally replies with a relevant GIF
+
+**Requirements:**
+- Giphy API key
+
+**How to enable:**
+1. Get API key at [developers.giphy.com](https://developers.giphy.com)
+2. Add in Settings → API Keys
+
+### Self Awareness
+**Description:** Answer questions about Asta from real docs
+
+**Requirements:** None (always available)
+
+### Server Status
+**Description:** Monitor CPU, RAM, Disk, Uptime
+
+**Requirements:** None (always available)
+
+## CLI-based Skills
+
+These skills use command-line tools and require both the binary installed and exec access enabled.
+
+### Google Workspace
+**Description:** Read Gmail, Calendar, Drive, Contacts via `gog` CLI
+
+**Requirements:**
+- `gog` CLI installed
+- Binary in exec allowlist
+- Authenticated Google account
+
+**How to enable:**
+```bash
+# Install gog
+brew install gogcli
+
+# Authenticate
+gog auth add your@gmail.com --services gmail,calendar,drive,contacts
+
+# Enable in Asta
+# In backend/.env
+ASTA_EXEC_ALLOWED_BINS=gog
+ASTA_EXEC_SECURITY=allowlist
+```
+
+### GitHub
+**Description:** Manage repos, issues, PRs, CI runs via `gh` CLI
+
+**Requirements:**
+- `gh` CLI installed
+- Binary in exec allowlist
+- Authenticated GitHub account
+
+**How to enable:**
+```bash
+# Install gh
+brew install gh
+
+# Authenticate
+gh auth login
+
+# Enable in Asta
+# In backend/.env
+ASTA_EXEC_ALLOWED_BINS=gh
+ASTA_EXEC_SECURITY=allowlist
+```
+
+### Vercel
+**Description:** Check deployments and projects via `vercel` CLI
+
+**Requirements:**
+- `vercel` CLI installed
+- Binary in exec allowlist
+- Authenticated Vercel account
+
+**How to enable:**
+```bash
+# Install vercel
+npm i -g vercel
+
+# Authenticate
+vercel login
+
+# Enable in Asta
+# In backend/.env
+ASTA_EXEC_ALLOWED_BINS=vercel
+ASTA_EXEC_SECURITY=allowlist
+```
+
+## Workspace Skills
+
+Custom skills in `workspace/skills/` are automatically detected. Each skill is a folder with a `SKILL.md` file.
+
+See [Workspace Configuration](/configuration/workspace#custom-skills) for how to create your own.
+
+## Exec Security
+
+Skills that run external binaries require exec permissions:
+
+<CodeGroup>
+```bash Allowlist Mode (Recommended)
+# In backend/.env
+ASTA_EXEC_SECURITY=allowlist
+ASTA_EXEC_ALLOWED_BINS=memo,things,gog,gh,vercel
+```
+
+```bash Deny Mode
+# Disable exec completely
+ASTA_EXEC_SECURITY=deny
+```
+
+```bash Full Mode (Dangerous)
+# Allow any command (use only if you trust the agent)
+ASTA_EXEC_SECURITY=full
+```
+</CodeGroup>
+
+<Warning>
+  Skills with `required_bins` automatically add their binaries to the allowlist when enabled in the UI. Manual configuration is only needed if you want to pre-configure before enabling.
+</Warning>
+
+## Skill Dependencies
+
+The backend checks skill availability at runtime:
+
+- **Files**: checks `ASTA_ALLOWED_PATHS` or workspace path
+- **RAG**: checks Ollama reachable at `OLLAMA_BASE_URL`
+- **Spotify**: checks Client ID and Secret in database or env
+- **Silly GIF**: checks Giphy API key
+- **CLI skills**: checks binary in `$PATH` and exec allowlist
+
+You can view all skill statuses in Settings → Skills.
+
+## Testing Skills
+
+After enabling a skill:
+
+1. Ask Asta a question that would use the skill
+2. Check the response for tool usage (if `ASTA_SHOW_TOOL_TRACE=true`)
+3. View Settings → Status to see if the skill is marked available
+
+## Implementation Reference
+
+Skill configuration and availability logic is in:
+- `backend/app/routers/settings.py` (lines 73-92: skill definitions)
+- `backend/app/routers/settings.py` (lines 899-1014: `_get_all_skill_defs` and availability checks)

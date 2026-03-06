@@ -1,0 +1,301 @@
+---
+title: Telegram Bot
+description: Interact with Asta through Telegram with commands, approvals, and audio notes
+---
+
+Asta's Telegram bot provides a full-featured mobile interface with voice message support, inline approvals, and comprehensive command system.
+
+## Setup
+
+<Steps>
+  <Step title="Create bot with BotFather">
+    1. Message [@BotFather](https://t.me/botfather) on Telegram
+    2. Use `/newbot` and follow prompts
+    3. Copy the bot token
+  </Step>
+  
+  <Step title="Configure environment">
+    Add to your `.env`:
+    ```bash
+    TELEGRAM_BOT_TOKEN=your_bot_token_here
+    ```
+  </Step>
+  
+  <Step title="Optional: Restrict access">
+    Limit bot to specific users:
+    ```bash
+    TELEGRAM_ALLOWED_IDS=123456789,987654321
+    ```
+  </Step>
+  
+  <Step title="Start the bot">
+    The bot automatically registers on server startup. Send `/start` to begin.
+  </Step>
+</Steps>
+
+<Warning>
+Without `TELEGRAM_ALLOWED_IDS` configured, anyone with your bot link can use it. Always set an allowlist for production deployments.
+</Warning>
+
+## Bot Commands
+
+### Provider Management
+
+#### `/provider`
+Show interactive provider selection with inline buttons:
+
+- Claude (🧠)
+- Ollama (💻 Local)
+- OpenRouter (🌐)
+- OpenAI (🤖)
+- Google Gemini (🔍)
+- Groq (⚡)
+
+Tap a button to switch providers instantly.
+
+#### `/model`
+Display current model information:
+
+```
+Provider: Claude
+Model: claude-sonnet-4-20250514
+```
+
+### Thinking and Reasoning
+
+#### `/think` (aliases: `/thinking`, `/t`)
+Set thinking level with inline buttons:
+
+```
+/think high
+```
+
+Options: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`
+
+<Note>
+Available levels depend on your active model. `xhigh` requires specific models like GPT-5.2 or Claude Opus.
+</Note>
+
+#### `/reasoning`
+Control reasoning visibility:
+
+- **off** - Hide reasoning blocks
+- **on** - Show reasoning before final answer
+- **stream** - Send incremental status updates
+
+```
+/reasoning stream
+```
+
+### Execution Controls
+
+#### `/exec_mode`
+Control shell command safety:
+
+```
+/exec_mode allowlist
+```
+
+Modes:
+- **deny** - Exec disabled (safest)
+- **allowlist** - Only allowed binaries run
+- **full** - Any command allowed (use with caution)
+
+<Warning>
+`full` mode allows Asta to run any command on your system. Only use in trusted, sandboxed environments.
+</Warning>
+
+#### `/allow <binary>`
+Add a binary to the execution allowlist:
+
+```
+/allow rg
+/allow ffmpeg
+/allow convert
+```
+
+Restrictions:
+- Only alphanumeric names with `._+-`
+- Shell launchers blocked (`bash`, `sh`, `powershell`, etc.)
+
+#### `/allowlist`
+Show current allowlist configuration:
+
+```
+Exec mode: allowlist
+
+Env bins: git,npm,python3
+Extra bins: rg,ffmpeg,convert
+Effective bins: convert,ffmpeg,git,npm,python3,rg
+```
+
+### Approval System
+
+#### `/approvals`
+List pending execution approvals with inline action buttons.
+
+When Asta needs to run a command in `allowlist` mode, you'll receive:
+
+```
+This action is blocked pending exec approval.
+
+1. app_a1b2c3d4
+Binary: rg
+Command: rg "TODO" src/
+
+[✅ Once] [✅ Always] [❌ Deny]
+```
+
+<Steps>
+  <Step title="Once">
+    Run this command one time only
+  </Step>
+  
+  <Step title="Always">
+    Add binary to allowlist and run (all future calls allowed)
+  </Step>
+  
+  <Step title="Deny">
+    Reject the command
+  </Step>
+</Steps>
+
+After approval, Asta automatically resumes your request with the command result.
+
+### Subagent Management
+
+#### `/subagents`
+Manage background subagents:
+
+```bash
+/subagents list           # Show active subagents
+/subagents spawn <task>   # Create new subagent
+/subagents info <runId>   # Show subagent details
+/subagents send <runId> <message>  # Send message to subagent
+/subagents kill <runId>   # Terminate subagent
+```
+
+Example:
+```
+/subagents spawn Monitor GitHub issues and notify me of new bugs
+```
+
+### Status Commands
+
+#### `/status`
+Show system health:
+
+```
+Provider: claude
+Model: claude-sonnet-4
+Thinking: medium
+Reasoning: stream
+Exec mode: allowlist
+Skills: calendar ✅, audio_notes ✅, files ✅
+```
+
+## Audio Notes
+
+Send voice messages or audio files for transcription and formatting:
+
+<Steps>
+  <Step title="Record or attach">
+    - Voice message (up to 20 MB)
+    - Audio file (.mp3, .m4a, .wav, .ogg, etc.)
+    - Direct download link (up to 50 MB)
+  </Step>
+  
+  <Step title="Add caption (optional)">
+    Caption specifies formatting:
+    - `meeting notes` - Save as retrievable meeting
+    - `action items` - Extract todos
+    - `conversation summary` - Summarize dialogue
+  </Step>
+  
+  <Step title="Receive formatted output">
+    Asta transcribes with faster-whisper and formats with AI:
+    
+    ```
+    📝 Meeting Notes - March 6, 2026
+
+    ## Key Points
+    - Q2 roadmap approved
+    - Launch date: April 15
+    - Team expansion: 2 new engineers
+
+    ## Action Items
+    [ ] Sarah: Finalize design specs
+    [ ] Mike: Set up CI/CD pipeline
+    ```
+  </Step>
+</Steps>
+
+### Audio from URL
+
+Workaround for files larger than Telegram's 20 MB limit:
+
+```
+https://example.com/recording.m4a
+Format as meeting notes
+```
+
+Asta downloads and processes files up to 50 MB.
+
+<Note>
+Meeting notes with "meeting" in the instruction are automatically saved and can be retrieved later with queries like "What did we discuss in the last meeting?"
+</Note>
+
+## Message Processing
+
+All text messages are processed through the same `handle_message` flow as the web interface:
+
+1. **Sequential per-chat** - Lock prevents race conditions
+2. **Context building** - Pulls from calendar, files, integrations
+3. **AI response** - Uses your default provider
+4. **Markdown formatting** - Converts to Telegram HTML
+5. **Media extraction** - Sends images/GIFs as native Telegram media
+
+### Special Behaviors
+
+**Short agreements** - When Asta replies with short yes/no answers, it reacts to your message with 👍 instead (cooldown: 15 minutes).
+
+**GIF support** - Markdown images with Giphy or `.gif` URLs are sent as animations.
+
+**Data URLs** - Base64 data image URLs are decoded and sent as photos.
+
+## Implementation Reference
+
+See `backend/app/channels/telegram_bot.py`:
+
+- **Lines 343-463**: Main message handler
+- **Lines 466-539**: Voice/audio handler
+- **Lines 614-668**: Provider selection
+- **Lines 670-688**: Model info
+- **Lines 1119-1161**: Exec mode controls
+- **Lines 838-886**: Allow command
+- **Lines 993-1019**: Approvals list
+- **Lines 1021-1090**: Approval callback handler
+- **Lines 1223-1278**: Thinking controls
+- **Lines 1317-1355**: Reasoning controls
+
+## Rate Limiting
+
+The bot uses `AIORateLimiter` from python-telegram-bot to prevent API overload. Automatic retry with exponential backoff.
+
+## Error Handling
+
+Errors are sent as replies and persisted to conversation history for consistency:
+
+```python
+try:
+    reply = await handle_message(user_id, "telegram", text, ...)
+    await message.reply_text(reply)
+except Exception as e:
+    err_text = f"Error: {str(e)[:500]}"
+    await message.reply_text(err_text)
+    # Persist to DB so history stays consistent
+    await db.add_message(cid, "user", text)
+    await db.add_message(cid, "assistant", err_text, None)
+```
+
+This ensures users can see their full conversation history including errors.

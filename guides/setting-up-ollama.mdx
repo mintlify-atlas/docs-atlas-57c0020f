@@ -1,0 +1,197 @@
+---
+title: Setting Up Ollama for Local AI
+description: Install Ollama and configure local AI models for embeddings and chat
+---
+
+# Setting Up Ollama for Local AI
+
+Ollama provides local AI inference without cloud dependencies. Asta uses Ollama for:
+
+- **RAG embeddings** with `nomic-embed-text`
+- **Local chat** with models like `llama3`, `mistral`, or `qwen`
+- **Privacy-focused workflows** that keep data on your machine
+
+<Steps>
+  <Step title="Install Ollama">
+    Download and install Ollama from [ollama.com](https://ollama.com)
+
+    **macOS/Linux:**
+    ```bash
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
+
+    **Windows:**
+    Download the installer from [ollama.com/download](https://ollama.com/download)
+
+    **Verify installation:**
+    ```bash
+    ollama --version
+    ```
+  </Step>
+
+  <Step title="Pull the RAG embedding model">
+    Asta's Learning skill requires `nomic-embed-text` for semantic search:
+
+    ```bash
+    ollama pull nomic-embed-text
+    ```
+
+    This model is lightweight (~274 MB) and optimized for embeddings.
+  </Step>
+
+  <Step title="Start Ollama server">
+    Ollama runs as a background service. Start it with:
+
+    ```bash
+    ollama serve
+    ```
+
+    Or launch the Ollama app. The API runs at `http://localhost:11434` by default.
+
+    <Note>
+      On macOS, Ollama starts automatically when you pull a model or run `ollama serve`.
+    </Note>
+  </Step>
+
+  <Step title="Pull a chat model (optional)">
+    For local chat inference, pull a model:
+
+    ```bash
+    # Lightweight (4GB)
+    ollama pull llama3.2:3b
+
+    # Balanced (7GB)
+    ollama pull mistral
+
+    # Advanced (16GB+)
+    ollama pull llama3.1:70b
+    ```
+
+    List available models at [ollama.com/library](https://ollama.com/library)
+  </Step>
+
+  <Step title="Configure Asta to use Ollama">
+    In Asta's web panel or desktop app:
+
+    1. Go to **Settings → AI Providers**
+    2. Enable **Ollama** and set it as your default provider
+    3. Select a chat model (e.g., `llama3.2:3b`)
+    4. Save settings
+
+    Asta will automatically use Ollama for RAG if `nomic-embed-text` is available.
+  </Step>
+</Steps>
+
+## Quick Setup Script
+
+Asta includes a setup script that installs Ollama (Linux/macOS) and pulls the RAG model:
+
+```bash
+cd ~/workspace/source
+./scripts/setup_ollama_rag.sh -i
+```
+
+**What it does:**
+- Installs Ollama via `curl | sh` (Linux/macOS only)
+- Pulls `nomic-embed-text`
+- Verifies the installation
+
+Source: `~/workspace/source/scripts/setup_ollama_rag.sh`
+
+## Configuration
+
+### Environment Variables
+
+Set these in `.env` or Settings:
+
+```bash
+# Ollama API endpoint
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Model for RAG embeddings
+ASTAMISTRAL_OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Default chat model
+OLLAMA_MODEL=llama3.2:3b
+```
+
+### Testing RAG
+
+Once configured, test the Learning skill:
+
+```
+Learn about Python asyncio for 2 minutes
+```
+
+Asta will:
+1. Research the topic via web search
+2. Generate embeddings with `nomic-embed-text`
+3. Store knowledge in ChromaDB for retrieval
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Ollama not found in PATH">
+    After installation, restart your terminal or add Ollama to PATH:
+
+    ```bash
+    export PATH="$PATH:/usr/local/bin"
+    ```
+
+    On macOS, Ollama installs to `/usr/local/bin` by default.
+  </Accordion>
+
+  <Accordion title="Connection refused at localhost:11434">
+    Ensure Ollama is running:
+
+    ```bash
+    ollama serve
+    ```
+
+    Or launch the Ollama app from your Applications folder.
+  </Accordion>
+
+  <Accordion title="Model not found error">
+    Verify the model is pulled:
+
+    ```bash
+    ollama list
+    ```
+
+    If missing, pull it:
+
+    ```bash
+    ollama pull nomic-embed-text
+    ```
+  </Accordion>
+
+  <Accordion title="RAG embeddings not working">
+    Check these steps:
+
+    1. `nomic-embed-text` is pulled: `ollama list`
+    2. Ollama is running: `curl http://localhost:11434/api/tags`
+    3. Environment variable is set: `echo $ASTAMISTRA L_OLLAMA_EMBEDDING_MODEL`
+
+    Restart Asta backend after configuration changes.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **macOS permission dialogs:** When Asta first uses Ollama, macOS may prompt for network access. Allow the backend process (Python) to connect to `localhost:11434`.
+</Warning>
+
+## Model Recommendations
+
+| Model | Size | Use Case |
+|-------|------|----------|
+| `nomic-embed-text` | 274 MB | RAG embeddings (required) |
+| `llama3.2:3b` | 4 GB | Fast chat, low memory |
+| `mistral` | 7 GB | Balanced quality/speed |
+| `qwen2.5:7b` | 7 GB | Excellent for coding |
+| `llama3.1:70b` | 40 GB | Advanced reasoning (requires 64GB+ RAM) |
+
+## Next Steps
+
+- [Creating Skills](/guides/creating-skills) - Build custom workspace skills
+- [Telegram Bot Setup](/guides/telegram-bot) - Connect Asta to Telegram
+- [RAG Learning](/features/learning-rag) - Deep dive into the Learning skill

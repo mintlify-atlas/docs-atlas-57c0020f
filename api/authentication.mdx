@@ -1,0 +1,402 @@
+---
+title: 'Authentication'
+description: 'User authentication and management endpoints'
+icon: 'lock'
+---
+
+## Overview
+
+Asta uses JWT (JSON Web Token) based authentication. After logging in, include the token in the `Authorization` header for subsequent requests.
+
+### Authorization Header Format
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+---
+
+## Login
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user@example.com",
+    "password": "your-password"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "user-123",
+    "username": "user@example.com",
+    "role": "user"
+  }
+}
+```
+
+</ResponseExample>
+
+### POST /api/auth/login
+
+Authenticate a user and receive a JWT access token.
+
+#### Request Body
+
+<ParamField body="username" type="string" required>
+  The user's username or email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password
+</ParamField>
+
+#### Response
+
+<ResponseField name="access_token" type="string">
+  JWT token for authenticating subsequent requests. Include in the `Authorization: Bearer <token>` header.
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  User information object
+  
+  <Expandable title="properties">
+    <ResponseField name="id" type="string">
+      Unique user identifier
+    </ResponseField>
+    
+    <ResponseField name="username" type="string">
+      The user's username
+    </ResponseField>
+    
+    <ResponseField name="role" type="string">
+      User role: `"admin"` or `"user"`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Error Responses
+
+- **401 Unauthorized**: Invalid username or password
+
+---
+
+## Register
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser@example.com",
+    "password": "secure-password"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "user": {
+    "id": "user-456",
+    "username": "newuser@example.com",
+    "role": "user"
+  }
+}
+```
+
+</ResponseExample>
+
+### POST /api/auth/register
+
+Create a new user account with the `user` role. Registration is only available when multi-user mode is active.
+
+#### Request Body
+
+<ParamField body="username" type="string" required>
+  Username for the new account (minimum 2 characters)
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password for the new account (minimum 4 characters)
+</ParamField>
+
+#### Response
+
+<ResponseField name="user" type="object">
+  Newly created user information
+  
+  <Expandable title="properties">
+    <ResponseField name="id" type="string">
+      Unique user identifier
+    </ResponseField>
+    
+    <ResponseField name="username" type="string">
+      The user's username
+    </ResponseField>
+    
+    <ResponseField name="role" type="string">
+      User role (always `"user"` for self-registration)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Error Responses
+
+- **400 Bad Request**: Username too short (< 2 characters) or password too short (< 4 characters)
+- **403 Forbidden**: Registration is not available (multi-user mode not active)
+- **409 Conflict**: Username already exists
+
+---
+
+## Get Current User
+
+<RequestExample>
+
+```bash cURL
+curl https://api.asta.app/api/auth/me \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "id": "user-123",
+  "username": "user@example.com",
+  "role": "user"
+}
+```
+
+</ResponseExample>
+
+### GET /api/auth/me
+
+Retrieve information about the currently authenticated user.
+
+#### Response
+
+<ResponseField name="id" type="string">
+  Unique user identifier
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  The user's username
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User role: `"admin"` or `"user"`
+</ResponseField>
+
+---
+
+## Change Password
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/auth/change-password \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "old-password",
+    "new_password": "new-secure-password"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "ok": true
+}
+```
+
+</ResponseExample>
+
+### POST /api/auth/change-password
+
+Change the password for the currently authenticated user.
+
+#### Request Body
+
+<ParamField body="current_password" type="string" required>
+  The user's current password for verification
+</ParamField>
+
+<ParamField body="new_password" type="string" required>
+  The new password to set
+</ParamField>
+
+#### Response
+
+<ResponseField name="ok" type="boolean">
+  Returns `true` if password was changed successfully
+</ResponseField>
+
+#### Error Responses
+
+- **401 Unauthorized**: Current password is incorrect
+- **404 Not Found**: User not found
+
+---
+
+## Admin Endpoints
+
+The following endpoints require admin privileges.
+
+### List Users
+
+### GET /api/auth/users
+
+List all users in the system. **Requires admin role.**
+
+<RequestExample>
+
+```bash cURL
+curl https://api.asta.app/api/auth/users \
+  -H "Authorization: Bearer <admin-jwt-token>"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "users": [
+    {
+      "id": "user-123",
+      "username": "admin@example.com",
+      "role": "admin"
+    },
+    {
+      "id": "user-456",
+      "username": "user@example.com",
+      "role": "user"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+<ResponseField name="users" type="array">
+  Array of user objects
+</ResponseField>
+
+---
+
+### Create User
+
+### POST /api/auth/users
+
+Create a new user with a specified role. **Requires admin role.**
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.asta.app/api/auth/users \
+  -H "Authorization: Bearer <admin-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newadmin@example.com",
+    "password": "secure-password",
+    "role": "admin"
+  }'
+```
+
+</RequestExample>
+
+<ParamField body="username" type="string" required>
+  Username for the new account
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password for the new account (minimum 4 characters)
+</ParamField>
+
+<ParamField body="role" type="string" default="user">
+  User role: `"admin"` or `"user"`
+</ParamField>
+
+#### Error Responses
+
+- **400 Bad Request**: Invalid role or password too short
+- **409 Conflict**: Username already exists
+
+---
+
+### Delete User
+
+### DELETE /api/auth/users/{user_id}
+
+Delete a user by ID. **Requires admin role.** You cannot delete yourself.
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://api.asta.app/api/auth/users/user-456 \
+  -H "Authorization: Bearer <admin-jwt-token>"
+```
+
+</RequestExample>
+
+<ParamField path="user_id" type="string" required>
+  The ID of the user to delete
+</ParamField>
+
+#### Error Responses
+
+- **400 Bad Request**: Cannot delete yourself
+- **404 Not Found**: User not found
+
+---
+
+### Reset User Password
+
+### PUT /api/auth/users/{user_id}/reset-password
+
+Reset another user's password. **Requires admin role.**
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT https://api.asta.app/api/auth/users/user-456/reset-password \
+  -H "Authorization: Bearer <admin-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "new_password": "new-secure-password"
+  }'
+```
+
+</RequestExample>
+
+<ParamField path="user_id" type="string" required>
+  The ID of the user whose password to reset
+</ParamField>
+
+<ParamField body="new_password" type="string" required>
+  The new password to set (minimum 4 characters)
+</ParamField>
+
+#### Error Responses
+
+- **400 Bad Request**: Password too short
+- **404 Not Found**: User not found

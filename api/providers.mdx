@@ -1,0 +1,284 @@
+---
+title: 'Providers'
+description: 'AI provider management and configuration'
+icon: 'microchip'
+---
+
+## Overview
+
+Providers in Asta represent different AI services that can process chat requests. Each provider has its own configuration, models, and capabilities.
+
+---
+
+## Available Providers
+
+Asta currently supports the following AI providers:
+
+- **ollama** - Local Ollama instance
+- **groq** - Groq cloud API
+- **google** - Google Gemini API
+- **claude** - Anthropic Claude API
+- **openai** - OpenAI API
+- **openrouter** - OpenRouter API
+
+---
+
+## List Providers
+
+<RequestExample>
+
+```bash cURL
+curl https://api.asta.app/api/providers \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.asta.app/api/providers', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+console.log('Available providers:', data.providers);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://api.asta.app/api/providers',
+    headers={'Authorization': f'Bearer {token}'}
+)
+
+data = response.json()
+print('Available providers:', data['providers'])
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "providers": [
+    "ollama",
+    "groq",
+    "google",
+    "claude",
+    "openai",
+    "openrouter"
+  ]
+}
+```
+
+</ResponseExample>
+
+### GET /api/providers
+
+Retrieve a list of all available AI providers.
+
+#### Response
+
+<ResponseField name="providers" type="array">
+  Array of provider identifier strings. These can be used in the `provider` parameter when sending chat requests.
+</ResponseField>
+
+---
+
+## Provider Details
+
+Each provider implements a standardized interface with the following characteristics:
+
+### Provider Response Structure
+
+All providers return responses in a consistent format:
+
+```typescript
+interface ProviderResponse {
+  // The AI's response text
+  content: string;
+  
+  // Error information (if any)
+  error?: "auth" | "rate_limit" | "model" | "timeout" | "transient";
+  error_message?: string;
+  
+  // Additional metadata
+  meta?: {
+    model?: string;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
+  
+  // Tool calls (for function calling)
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+}
+```
+
+### Error Types
+
+<ResponseField name="auth" type="error">
+  API key is invalid or missing
+</ResponseField>
+
+<ResponseField name="rate_limit" type="error">
+  Rate limit exceeded for the provider
+</ResponseField>
+
+<ResponseField name="model" type="error">
+  The specified model does not exist or is not accessible
+</ResponseField>
+
+<ResponseField name="timeout" type="error">
+  Request timed out
+</ResponseField>
+
+<ResponseField name="transient" type="error">
+  Temporary error (connection reset, 500 error, etc.)
+</ResponseField>
+
+---
+
+## Provider Configuration
+
+Providers are configured via environment variables or the Asta configuration file. Each provider may require different credentials:
+
+### Ollama
+
+```bash
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Runs models locally. No API key required.
+
+### Groq
+
+```bash
+GROQ_API_KEY=your-groq-api-key
+```
+
+Fast inference for open-source models.
+
+### Google (Gemini)
+
+```bash
+GOOGLE_API_KEY=your-google-api-key
+```
+
+Access to Google's Gemini models.
+
+### Claude (Anthropic)
+
+```bash
+ANTHROPIC_API_KEY=your-anthropic-api-key
+```
+
+Access to Claude models with extended thinking capabilities.
+
+### OpenAI
+
+```bash
+OPENAI_API_KEY=your-openai-api-key
+```
+
+Access to GPT models.
+
+### OpenRouter
+
+```bash
+OPENROUTER_API_KEY=your-openrouter-api-key
+```
+
+Unified API for multiple AI providers.
+
+---
+
+## Provider Selection
+
+When sending a chat request, you can specify which provider to use:
+
+### Default Provider
+
+If you don't specify a provider (or use `provider: "default"`), Asta will use the user's configured default provider.
+
+```json
+{
+  "text": "Hello!",
+  "provider": "default"
+}
+```
+
+### Specific Provider
+
+You can explicitly choose a provider:
+
+```json
+{
+  "text": "Hello!",
+  "provider": "claude"
+}
+```
+
+---
+
+## Provider Capabilities
+
+### Streaming Support
+
+All providers support both standard and streaming responses:
+
+- Use `/api/chat` for complete responses
+- Use `/api/chat` for token-by-token streaming
+
+### Vision Support
+
+Providers with vision capabilities can process images:
+
+- **claude** - Supports image inputs
+- **google** - Supports image inputs
+- **openai** - Supports image inputs (GPT-4 Vision)
+
+Send images using the `image_base64` and `image_mime` parameters:
+
+```json
+{
+  "text": "What's in this image?",
+  "provider": "claude",
+  "image_base64": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "image_mime": "image/png"
+}
+```
+
+### Tool/Function Calling
+
+Providers support tool calling for extended capabilities:
+
+- Web search
+- Web page fetching
+- Code execution
+- File operations
+
+These are automatically enabled based on your request context.
+
+---
+
+## Provider Runtime State
+
+Each provider maintains runtime state including:
+
+- **Connection status** - Whether the provider is reachable
+- **Model availability** - Which models are currently available
+- **Rate limit status** - Current rate limit state
+- **Error tracking** - Recent errors and their types
+
+This state is managed internally and used to provide better error messages and automatic fallbacks.

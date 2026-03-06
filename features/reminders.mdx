@@ -1,0 +1,322 @@
+---
+title: "Reminders & Scheduling"
+description: "Set one-time reminders and recurring scheduled tasks with natural language or cron expressions"
+---
+
+Asta includes a powerful reminders and scheduling system that lets you create both one-time notifications and recurring automated tasks. You can use natural language for simple reminders or cron expressions for advanced scheduling.
+
+## Natural Language Reminders
+
+Create reminders using everyday language without worrying about complex syntax.
+
+<Steps>
+  <Step title="Set a quick reminder">
+    Just tell Asta when you want to be reminded:
+    
+    ```
+    remind me in 30 min to take a break
+    set alarm in 5 min
+    timer 10 min
+    ```
+  </Step>
+
+  <Step title="Schedule for specific times">
+    Set reminders for exact times today or tomorrow:
+    
+    ```
+    remind me at 6pm to call mom
+    wake me up at 7am
+    alarm tomorrow at 8am
+    set reminder for 18:00 to start dinner
+    ```
+  </Step>
+
+  <Step title="Use relative time expressions">
+    Asta understands various time formats:
+    
+    ```
+    5 min from now
+    in 2 hours
+    30 minutes from now to check the oven
+    ```
+  </Step>
+</Steps>
+
+### Supported Time Formats
+
+The reminder parser recognizes multiple patterns:
+
+- **Minutes/Hours**: `30 min`, `2 hours`, `5m`, `1hr`
+- **AM/PM**: `7am`, `6:30pm`, `18:00`
+- **Relative**: `in 30 min`, `5 min from now`
+- **Tomorrow**: `tomorrow at 7am`, `wake me up tomorrow at 8am`
+
+<Note>
+  All times are interpreted using your configured timezone. Set your timezone in the user settings to ensure accurate scheduling.
+</Note>
+
+## Voice Call Reminders (Pingram)
+
+Asta can trigger voice calls for important reminders using the Pingram (NotificationAPI) integration.
+
+<Steps>
+  <Step title="Configure Pingram credentials">
+    Set your Pingram API credentials in environment variables:
+    
+    ```bash
+    # Option 1: API Key (recommended)
+    export ASTA_PINGRAM_API_KEY="your-api-key"
+    export ASTA_PINGRAM_CLIENT_ID="your-client-id"
+    
+    # Option 2: Client credentials
+    export ASTA_PINGRAM_CLIENT_ID="your-client-id"
+    export ASTA_PINGRAM_CLIENT_SECRET="your-client-secret"
+    ```
+  </Step>
+
+  <Step title="Set your phone number">
+    Configure your phone number for voice calls:
+    
+    ```bash
+    export ASTA_OWNER_PHONE_NUMBER="+1234567890"
+    ```
+    
+    <Note>
+      Phone numbers must include the country code (e.g., +1 for US).
+    </Note>
+  </Step>
+
+  <Step title="Enable voice calls for a reminder">
+    When creating a cron job or reminder, set `tlg_call: true` to enable voice notifications.
+  </Step>
+</Steps>
+
+### Pingram Configuration Options
+
+```python
+# Environment variables for Pingram
+ASTA_PINGRAM_API_KEY="your-api-key"           # API Key (preferred)
+ASTA_PINGRAM_CLIENT_ID="your-client-id"       # Client ID (required)
+ASTA_PINGRAM_CLIENT_SECRET="your-secret"      # Client Secret (alternative to API Key)
+ASTA_PINGRAM_NOTIFICATION_ID="cron_alert"     # Notification type (default: cron_alert)
+ASTA_PINGRAM_TEMPLATE_ID="your-template-id"   # Custom voice template (optional)
+ASTA_OWNER_PHONE_NUMBER="+1234567890"         # Your phone number
+```
+
+## Cron Scheduling
+
+For recurring tasks, Asta uses standard 5-field cron expressions with powerful scheduling capabilities.
+
+### Cron Expression Format
+
+```
+* * * * *
+│ │ │ │ │
+│ │ │ │ └─── Day of week (0-6, Sunday=0)
+│ │ │ └───── Month (1-12)
+│ │ └─────── Day of month (1-31)
+│ └───────── Hour (0-23)
+└─────────── Minute (0-59)
+```
+
+### Common Cron Examples
+
+<CodeGroup>
+```cron Daily at 9am
+0 9 * * *
+```
+
+```cron Every weekday at 8am
+0 8 * * 1-5
+```
+
+```cron Every 30 minutes
+*/30 * * * *
+```
+
+```cron First day of month at noon
+0 12 1 * *
+```
+
+```cron Every Monday at 10am
+0 10 * * 1
+```
+</CodeGroup>
+
+### Creating Recurring Jobs
+
+Cron jobs are stored in the database and loaded on startup. They can trigger:
+
+1. **Direct notifications** - Simple text notifications
+2. **AI turns** - Run a message through the AI handler for dynamic responses
+3. **Voice calls** - Trigger Pingram voice notifications
+
+```python
+# Example: Creating a daily standup reminder
+# This would be done through the API or database
+{
+  "user_id": "default",
+  "channel": "telegram",
+  "channel_target": "your_chat_id",
+  "message": "Time for daily standup!",
+  "cron_expr": "0 9 * * 1-5",  # Weekdays at 9am
+  "tz": "America/New_York",
+  "enabled": true,
+  "payload_kind": "notify",
+  "tlg_call": false
+}
+```
+
+<Note>
+  Timezone-aware scheduling is supported via the `tz` field. Use IANA timezone names like `America/New_York` or `Europe/London`.
+</Note>
+
+## One-Shot vs Recurring
+
+Asta supports two types of scheduled tasks:
+
+### One-Shot Reminders
+
+- Created with natural language (`remind me in 30 min`)
+- Stored with special `@at:` cron expression format
+- Automatically fired at startup if past due
+- Marked as `sent` after execution
+- Removed from scheduler after firing
+
+```python
+# Internal format for one-shot reminder
+cron_expr = "@at:2026-03-06T15:30:00Z"  # ISO 8601 UTC timestamp
+```
+
+### Recurring Jobs
+
+- Use standard 5-field cron expressions
+- Remain active until disabled
+- Support timezone-aware scheduling
+- Can trigger AI responses or notifications
+- Execution history tracked in database
+
+## Implementation Details
+
+The reminder system is implemented across two main files:
+
+### `backend/app/reminders.py`
+
+- Natural language parsing with regex patterns
+- Timezone-aware time conversion
+- Pingram voice call integration
+- Telegram notification delivery
+- Reminder scheduling and persistence
+
+### `backend/app/cron_runner.py`
+
+- APScheduler integration for job execution
+- Cron expression parsing and validation
+- One-shot and recurring job management
+- Job execution history and error tracking
+- Startup job reload and past-due handling
+
+<CodeGroup>
+```python Parse reminder
+from app.reminders import parse_reminder
+
+# Parse natural language into structured reminder
+result = parse_reminder(
+    "remind me at 7am tomorrow to check email",
+    tz_str="America/New_York"
+)
+
+# Returns:
+# {
+#   "message": "check email",
+#   "run_at": datetime(2026, 3, 7, 12, 0, 0, tzinfo=timezone.utc),
+#   "display_time": "7:00 AM"
+# }
+```
+
+```python Schedule reminder
+from app.reminders import schedule_reminder
+from datetime import datetime, timezone, timedelta
+
+# Schedule a reminder
+run_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+reminder_id = await schedule_reminder(
+    user_id="user123",
+    channel="telegram",
+    channel_target="chat_id",
+    message="Take a break!",
+    run_at=run_at,
+    tlg_call=False
+)
+```
+
+```python Create cron job
+from app.cron_runner import add_cron_job_to_scheduler
+from app.tasks.scheduler import get_scheduler
+
+# Add recurring job to scheduler
+scheduler = get_scheduler()
+add_cron_job_to_scheduler(
+    scheduler,
+    job_id=123,
+    cron_expr="0 9 * * 1-5",  # Weekdays at 9am
+    tz_str="America/New_York"
+)
+```
+</CodeGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use natural language for one-time reminders">
+    Natural language is perfect for quick, one-off reminders:
+    - `remind me in 30 min to switch the laundry`
+    - `wake me up at 7am`
+    - `alarm in 5 minutes`
+  </Step>
+
+  <Step title="Use cron for recurring tasks">
+    Cron expressions are ideal for regular schedules:
+    - Daily standups
+    - Weekly reports
+    - Monthly billing reminders
+    - Periodic health checks
+  </Step>
+
+  <Step title="Set appropriate timezones">
+    Always configure your timezone for accurate scheduling:
+    - User settings for personal reminders
+    - Cron job `tz` field for specific schedules
+    - Server timezone as fallback
+  </Step>
+
+  <Step title="Enable voice calls for critical reminders">
+    Use Pingram voice calls for important notifications:
+    - Wake-up alarms
+    - Time-sensitive alerts
+    - Emergency notifications
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Reminders not firing
+
+- **Check timezone**: Ensure your timezone is configured correctly
+- **Verify cron expression**: Use a cron validator to check syntax
+- **Check scheduler logs**: Look for errors in the application logs
+- **Past-due jobs**: One-shot reminders fire immediately on startup if past due
+
+### Voice calls not working
+
+- **Verify Pingram credentials**: Check API key and client ID
+- **Phone number format**: Must include country code (e.g., `+1234567890`)
+- **Check logs**: Look for Pingram API errors in application logs
+- **Test notification**: Use NotificationAPI dashboard to test
+
+### Cron jobs not loading
+
+- **Database connection**: Ensure database is accessible
+- **Job enabled flag**: Check that `enabled=true` in database
+- **Cron expression validation**: Verify expression is valid
+- **Startup logs**: Check for reload messages on application start

@@ -1,0 +1,424 @@
+---
+title: Creating Custom Skills
+description: Build workspace skills with SKILL.md format for on-demand AI loading
+---
+
+# Creating Custom Skills
+
+Asta uses an **OpenClaw-style skill system**: skills are folders under `workspace/skills/` with a `SKILL.md` file. The AI selects the best skill based on the user's message and loads it on demand.
+
+## Why Skills?
+
+- **On-demand loading:** Keeps context lean—only loaded when needed
+- **Clear separation:** Built-in Python skills vs. workspace custom skills
+- **Composable:** Chain skills (e.g., web search → Notion save)
+- **Portable:** Copy skill folders between Asta instances or share them
+
+<Note>
+  Skills from [OpenClaw](https://openclaw.ai) and Atomic Bot work in Asta with minimal or no changes.
+</Note>
+
+## Skill Structure
+
+```
+workspace/skills/<skill-id>/
+├── SKILL.md          # Required: frontmatter + instructions
+├── reference.md      # Optional: detailed docs
+├── examples.md       # Optional: usage examples
+└── scripts/          # Optional: helper scripts
+```
+
+## SKILL.md Format
+
+Every skill needs YAML frontmatter and a markdown body:
+
+```markdown
+---
+name: my-skill
+description: One-line summary. Use when the user asks for X or mentions Y.
+metadata:
+  openclaw:
+    emoji: "🔧"
+    requires:
+      bins: ["jq", "curl"]
+      env: ["API_KEY"]
+---
+
+# My Skill
+
+Instructions, commands, and examples for the AI to follow.
+```
+
+### Frontmatter Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Unique skill ID (lowercase, hyphens: `my-skill`) |
+| `description` | Yes | What the skill does + when to use it (critical for selection) |
+| `metadata` | No | OpenClaw-style metadata (emoji, requires, install instructions) |
+
+### Metadata: `requires`
+
+Declare dependencies so Asta knows what binaries or environment variables the skill needs:
+
+```yaml
+metadata:
+  openclaw:
+    requires:
+      bins: ["memo", "osascript"]  # Required binaries
+      env: ["NOTION_API_KEY"]       # Required env vars
+```
+
+Asta will:
+- Check if binaries are in PATH before enabling the skill
+- Warn users if environment variables are missing
+- Auto-allow required binaries for exec (if `exec_security=allowlist`)
+
+<Tip>
+  Skills with `requires.bins` get their binaries automatically added to the exec allowlist when the skill is enabled.
+</Tip>
+
+### Metadata: `install`
+
+Provide installation instructions for missing dependencies:
+
+```yaml
+metadata:
+  openclaw:
+    install:
+      - id: brew
+        kind: brew
+        formula: antoniorodr/memo/memo
+        bins: ["memo"]
+        label: Install memo via Homebrew
+```
+
+Asta shows these in Settings → Skills when binaries are missing.
+
+## Writing the Description
+
+The `description` field is **critical** for skill selection. The AI matches it against user messages.
+
+### Good Descriptions
+
+✅ **Specific + trigger terms:**
+```yaml
+description: Manage Apple Notes via osascript and memo CLI. Use when the user asks to list notes, search notes, create a note, move notes, or delete notes.
+```
+
+✅ **What + when:**
+```yaml
+description: Notion API for creating, reading, updating, and querying pages and databases. Use when the user mentions Notion, asks to save to Notion, or check a Notion board.
+```
+
+### Bad Descriptions
+
+❌ **Too vague:**
+```yaml
+description: Helps with notes.
+```
+
+❌ **First person:**
+```yaml
+description: I can process Excel files and generate reports.
+```
+
+❌ **Missing trigger terms:**
+```yaml
+description: Apple Notes management.
+```
+
+<Warning>
+  If your skill isn't being selected, add more **trigger phrases** to the description (verbs and nouns the user might say).
+</Warning>
+
+## Skill Body: Instructions
+
+The markdown body contains instructions, commands, and examples. Write for the AI, not humans.
+
+### Best Practices
+
+1. **Start with a summary** of what the skill does
+2. **Group operations** into sections (List, Create, Update, Delete)
+3. **Show exact commands** with real examples
+4. **Highlight limitations** and edge cases
+5. **Keep it concise** (under 500 lines; split long docs into `reference.md`)
+
+### Example: Apple Notes Skill
+
+From `~/workspace/source/workspace/skills/apple-notes/SKILL.md`:
+
+```markdown
+# Apple Notes
+
+Full Apple Notes management via `osascript` (all operations) and `memo` (quick listing).
+
+**Key rule:** Always prefer `osascript` over `memo` for any write or move operation.
+
+## List & Read
+
+**List all notes (all folders):**
+```bash
+memo notes
+```
+
+**Read a note's content:**
+```bash
+osascript -e 'tell application "Notes" to get body of (first note of folder "Notes" whose name contains "Shopping")'
+```
+
+## Create
+
+**Create a note in a folder:**
+```bash
+osascript -e 'tell application "Notes" to make new note at folder "Notes" with properties {name:"Title", body:"Content here"}'
+```
+```
+
+This gives the AI:
+- **Clear commands** it can copy
+- **Section headers** for quick navigation
+- **Real examples** (not placeholders)
+
+## Complete Example: Weather Skill
+
+Here's a minimal skill that uses wttr.in for weather:
+
+```markdown
+---
+name: weather-wttr
+description: Get weather forecasts using wttr.in. Use when the user asks about weather, temperature, or forecast for a location.
+metadata:
+  openclaw:
+    emoji: "🌤️"
+    requires:
+      bins: ["curl"]
+---
+
+# Weather (wttr.in)
+
+Get weather forecasts via wttr.in API.
+
+## Current weather
+
+```bash
+curl "https://wttr.in/Tokyo?format=%l:+%C+%t+%w"
+```
+
+Output: `Tokyo: Clear +15°C ↓5km/h`
+
+## 3-day forecast
+
+```bash
+curl "https://wttr.in/London?format=3"
+```
+
+## Tips
+
+- Use `%l` for location, `%C` for condition, `%t` for temperature
+- Add `?format=3` for a 3-day text forecast
+- URL-encode location names with spaces: `New%20York`
+```
+
+Save to `workspace/skills/weather-wttr/SKILL.md` and Asta will auto-detect it.
+
+## Skill Discovery & Enabling
+
+<Steps>
+<Step title="Create the skill folder">
+Create a new directory for your skill in the workspace skills directory:
+
+- Run: `mkdir -p workspace/skills/myskill`
+- Navigate: `cd workspace/skills/myskill`
+</Step>
+
+<Step title="Write SKILL.md">
+Use the template above or copy an existing skill as a starting point.
+</Step>
+
+<Step title="Restart Asta (or reload skills)">
+Asta scans workspace/skills at startup. Restart the backend with: `asta.sh restart`
+</Step>
+
+<Step title="Enable the skill in Settings">
+1. Open Asta web panel: http://localhost:8000
+2. Go to Settings → Skills
+3. Find your skill and toggle it On
+4. If dependencies are missing, Asta shows installation hints
+</Step>
+</Steps>
+
+## Using Dependencies in Skills
+
+### Binaries
+
+If your skill needs a CLI tool, declare it in `requires.bins`:
+
+```yaml
+requires:
+  bins: ["jq", "curl"]
+```
+
+Asta checks if these binaries are in PATH. If missing, the skill is disabled until the user installs them.
+
+### Environment Variables
+
+For API keys or secrets:
+
+```yaml
+requires:
+  env: ["NOTION_API_KEY"]
+```
+
+Users set these in **Settings → Integrations** or `.env`. Asta injects them into the environment when running exec commands.
+
+**Accessing in commands:**
+```bash
+curl -H "Authorization: Bearer $NOTION_API_KEY" https://api.notion.com/v1/...
+```
+
+<Note>
+  **Security:** Asta redacts secrets from exec output logs. Never echo or print environment variables directly.
+</Note>
+
+## Multi-Step Operations
+
+For complex tasks (create → query → update), write inline bash scripts:
+
+```markdown
+## Create and update a Notion page
+
+```bash
+#!/bin/bash
+set -e
+KEY="$NOTION_API_KEY"
+HDR=('-H' "Authorization: Bearer $KEY" '-H' 'Content-Type: application/json')
+
+# Step 1: Create page
+PAGE_ID=$(curl -s -X POST "https://api.notion.com/v1/pages" "${HDR[@]}" \
+  -d '{"parent":{"database_id":"xxx"},"properties":{...}}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# Step 2: Add content
+curl -s -X PATCH "https://api.notion.com/v1/blocks/$PAGE_ID/children" "${HDR[@]}" \
+  -d '{"children":[{"object":"block","type":"paragraph",...}]}'
+```
+```
+
+The AI will execute this as a single command, preserving state between steps.
+
+## Referencing Other Files
+
+Split long docs into separate files:
+
+```
+workspace/skills/my-skill/
+├── SKILL.md
+├── reference.md       # Detailed API docs
+└── examples.md        # Usage examples
+```
+
+Link from SKILL.md:
+
+```markdown
+See [reference.md](reference.md) for full API details.
+```
+
+Asta resolves relative paths against the skill directory.
+
+## Testing Your Skill
+
+1. **Enable the skill** in Settings → Skills
+2. **Ask a question** that matches the description:
+   ```
+   What's the weather in Paris?
+   ```
+3. **Check logs** to see if the skill was loaded:
+   ```bash
+   tail -f ~/workspace/source/backend/asta.log | grep -i skill
+   ```
+4. **Verify exec commands** run (check Settings → Exec Logs)
+
+<Tip>
+  If the skill isn't loading, add more **trigger words** to the description or make it more specific.
+</Tip>
+
+## Example Skills from Asta Source
+
+Explore these skills in `~/workspace/source/workspace/skills/`:
+
+- **apple-notes** — Apple Notes via osascript and memo (macOS only)
+- **notion** — Notion API for pages, databases, and blocks
+- **things-mac** — Things 3 task management via CLI (macOS only)
+- **skill-creator** — Meta-skill for creating new skills
+
+Copy and adapt these as templates for your own skills.
+
+## Sharing Skills
+
+Skills are portable. To share:
+
+1. **Copy the skill folder** (e.g., `workspace/skills/my-skill/`)
+2. **Zip or git clone** to share with others
+3. **Drop into another Asta instance's** `workspace/skills/` folder
+4. **Restart Asta** to detect the new skill
+
+<CardGroup cols={2}>
+  <Card title="OpenClaw Skills" icon="download" href="https://openclaw.ai">
+    Browse community skills compatible with Asta
+  </Card>
+  <Card title="Skill Reference" icon="book" href="/concepts/skills-system">
+    Deep dive into skill architecture
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Skill not appearing in Settings">
+    - Check `SKILL.md` has valid frontmatter (name + description)
+    - Ensure the skill folder is in `workspace/skills/`
+    - Restart Asta backend: `./asta.sh restart`
+    - Check logs for syntax errors: `tail -f asta.log | grep -i skill`
+  </Accordion>
+
+  <Accordion title="Skill never gets selected">
+    - Add more **trigger phrases** to the description
+    - Test with direct questions that match the description
+    - Check if the skill is **enabled** in Settings → Skills
+    - Verify required binaries are installed (Settings shows warnings)
+  </Accordion>
+
+  <Accordion title="Required binary not found">
+    Asta checks `requires.bins` against PATH. Install the binary:
+
+    ```bash
+    # macOS
+    brew install <binary>
+
+    # Linux
+    sudo apt install <binary>
+    ```
+
+    Then restart Asta.
+  </Accordion>
+
+  <Accordion title="Environment variable not available">
+    Set the variable in:
+    - **Settings → Integrations** (web panel)
+    - Or `.env` in `~/workspace/source/backend/`
+
+    Example:
+    ```bash
+    NOTION_API_KEY=secret_xxx
+    ```
+
+    Restart Asta after changes.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- [Exec Tool Security](/guides/exec-tool) - Understand command execution
+- [Subagent Orchestration](/guides/subagents) - Run multi-step tasks in the background
+- [Telegram Bot Setup](/guides/telegram-bot) - Use skills from Telegram

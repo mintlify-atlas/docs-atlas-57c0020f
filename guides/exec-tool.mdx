@@ -1,0 +1,552 @@
+---
+title: Exec Tool for Running Commands
+description: Secure shell command execution with allowlist modes and process management
+---
+
+# Exec Tool for Running Commands
+
+Asta can run shell commands on your machine via the **exec tool**. This enables powerful integrations like:
+
+- **Reading local files** ("What's in my Apple Notes about banking?")
+- **Searching code** ("Find all TODOs in this project")
+- **Automating tasks** ("Commit and push these changes")
+- **System queries** ("Show me running Docker containers")
+
+Source: `~/workspace/source/backend/app/exec_tool.py`
+
+<Warning>
+  **Security:** Exec lets AI run commands with your permissions. Use `allowlist` mode and carefully approve commands.
+</Warning>
+
+## Security Modes
+
+Asta supports three exec security modes:
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| `deny` | No commands allowed | Maximum security (default on first run) |
+| `allowlist` | Only allowlisted binaries run | Recommended for normal use |
+| `full` | Any command allowed (runs via shell) | Advanced use (dangerous) |
+
+### Setting the Mode
+
+**Option 1: Web Settings**
+1. Go to **Settings → Exec Security**
+2. Select a mode
+3. Click **Save**
+
+**Option 2: Environment variable**
+```bash
+# In backend/.env
+ASTA_EXEC_SECURITY=allowlist
+```
+
+**Option 3: Telegram command**
+```
+/exec_mode allowlist
+```
+
+Restart Asta after changing modes.
+
+## Allowlist Mode (Recommended)
+
+In `allowlist` mode, only binaries you explicitly allow can run. This balances functionality and security.
+
+### Adding Binaries to the Allowlist
+
+**Environment variable (persistent):**
+```bash
+# In backend/.env
+ASTA_EXEC_ALLOWED_BINS=ls,cat,grep,git,npm,python3,node,curl,jq,memo
+```
+
+**Telegram command (runtime):**
+```
+/allow rg
+```
+
+Adds `rg` (ripgrep) to the allowlist immediately.
+
+**Settings UI:**
+1. Go to **Settings → Exec Security**
+2. Add comma-separated binaries to "Extra Allowed Bins"
+3. Save
+
+### Auto-Allowlist from Skills
+
+Source: `~/workspace/source/backend/app/exec_tool.py:267-298`
+
+When you enable a workspace skill with `requires.bins`, those binaries are **automatically added** to the allowlist:
+
+```yaml
+# In SKILL.md frontmatter
+metadata:
+  openclaw:
+    requires:
+      bins: ["memo", "osascript"]
+```
+
+Enable the skill → `memo` and `osascript` are allowed.
+
+<Tip>
+  Skills are the **recommended way** to manage allowlists. Create a skill for each workflow (e.g., "apple-notes", "git-workflow") and let Asta handle the binaries.
+</Tip>
+
+### Viewing the Allowlist
+
+**Telegram:**
+```
+/allowlist
+```
+
+**CLI:**
+```bash
+echo $ASTA_EXEC_ALLOWED_BINS
+```
+
+**Settings:** Check **Settings → Exec Security → Allowed Binaries**
+
+## Approval Flow (Allowlist Mode)
+
+Source: `~/workspace/source/backend/app/channels/telegram_bot.py:737-802`
+
+When Asta wants to run a command with a binary **not** in the allowlist, it requests approval:
+
+<Steps>
+  <Step title="Asta proposes a command">
+    **User:** "What notes do I have about gift cards?"
+
+    **Asta (internal):** Wants to run `memo notes -s "gift cards"`
+  </Step>
+
+  <Step title="Approval request">
+    **Telegram message:**
+    ```
+    This action is blocked pending exec approval.
+    Tap Once, Always, or Deny below.
+
+    1. app_abc123
+    Binary: memo
+    Command: `memo notes -s "gift cards"`
+    ```
+
+    **Buttons:** ✅ Once | ✅ Always | ❌ Deny
+  </Step>
+
+  <Step title="User approves or denies">
+    - **Once:** Runs the command this time only
+    - **Always:** Adds `memo` to the allowlist permanently + runs the command
+    - **Deny:** Blocks the command
+  </Step>
+
+  <Step title="Asta continues with result">
+    After approval, Asta automatically resumes the conversation with the command output.
+  </Step>
+</Steps>
+
+<Note>
+  Pending approvals expire after 1 hour. Use `/approvals` in Telegram to view and manage them.
+</Note>
+
+## Full Mode (Advanced)
+
+In `full` mode, **any command** runs via a real shell (`bash -lc <command>`).
+
+<Warning>
+  **Dangerous:** The AI can run destructive commands. Only use `full` mode if you:
+  - Fully trust the AI provider and model
+  - Understand the risks
+  - Need shell features (pipes, variables, multiline scripts)
+</Warning>
+
+### When to Use Full Mode
+
+- **Complex scripts:** Multiline bash with pipes, loops, variables
+- **Shell builtins:** `cd`, `export`, `source` (not available in allowlist mode)
+- **Rapid prototyping:** Testing workflows before creating a skill
+
+**Example (only works in full mode):**
+```bash
+export API_KEY=xxx
+for file in *.md; do
+  echo "Processing $file"
+  curl -X POST api.example.com -d @"$file"
+done
+```
+
+### Enabling Full Mode
+
+```bash
+# In backend/.env
+ASTA_EXEC_SECURITY=full
+```
+
+Restart Asta. **No approval prompts** will appear—every command runs immediately.
+
+<Warning>
+  Never use `full` mode in shared environments or with untrusted AI providers.
+</Warning>
+
+## Process Tool for Long-Running Commands
+
+Source: `~/workspace/source/backend/app/process_tool.py`
+
+For commands that take longer than a few seconds (e.g., web servers, monitoring, compilation), use the **process tool** for background execution.
+
+### Background vs. Foreground Exec
+
+**Foreground (default):**
+```bash
+npm run build
+```
+Blocks until complete. Suitable for quick commands (under 30 seconds).
+
+**Background:**
+```json
+{
+  "command": "npm run dev",
+  "background": true
+}
+```
+Starts in background, returns a `session_id` immediately.
+
+### Starting a Background Process
+
+Asta automatically backgrounds long-running commands. You can also request it explicitly:
+
+**User:**
+```
+Start the dev server in the background
+```
+
+**Asta:**
+```json
+// exec tool call
+{
+  "command": "npm run dev",
+  "background": true,
+  "workdir": "/home/user/project"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "running",
+  "session_id": "p_abc123",
+  "pid": 12345,
+  "tail": "Server listening on port 3000..."
+}
+```
+
+### Managing Background Processes
+
+Source: `~/workspace/source/backend/app/process_tool.py:490-534`
+
+**Process tool actions:**
+
+| Action | Description |
+|--------|-------------|
+| `list` | Show all running and finished processes |
+| `poll` | Check status and get new output |
+| `log` | Read full output (with offset/limit) |
+| `write` | Send stdin data (for interactive commands) |
+| `send-keys` | Send special keys (Enter, Ctrl-C, Tab) |
+| `submit` | Send newline (alias for write + Enter) |
+| `paste` | Paste text (with bracketed paste mode) |
+| `kill` | Terminate a process |
+| `clear` | Remove a finished process from history |
+| `remove` | Kill and remove a process |
+
+**Example: List running processes**
+```json
+{
+  "action": "list"
+}
+```
+
+**Response:**
+```json
+{
+  "running": [
+    {
+      "session_id": "p_abc123",
+      "command": "npm run dev",
+      "pid": 12345,
+      "runtime_sec": 120,
+      "tail": "Compiled successfully..."
+    }
+  ],
+  "finished": []
+}
+```
+
+**Example: Stop a process**
+```json
+{
+  "action": "kill",
+  "session_id": "p_abc123"
+}
+```
+
+### PTY Mode (Pseudo-Terminal)
+
+Some commands need a TTY (e.g., interactive prompts, colored output). Use `pty: true`:
+
+```json
+{
+  "command": "python3 script.py",
+  "background": true,
+  "pty": true
+}
+```
+
+This enables:
+- **Color codes** (ANSI escape sequences)
+- **Interactive input** (prompts, readline)
+- **Terminal size detection**
+
+<Note>
+  PTY mode is not supported on Windows in Asta's current runtime.
+</Note>
+
+### Yield Mode (Auto-Background)
+
+Source: `~/workspace/source/backend/app/process_tool.py:402-487`
+
+If a command runs longer than `yield_ms` (default: 10 seconds), it **automatically backgrounds**:
+
+```json
+{
+  "command": "npm test",
+  "yield_ms": 10000
+}
+```
+
+**Behavior:**
+- Waits up to 10 seconds for completion
+- If still running, returns `{"status": "running", "session_id": "..."}` immediately
+- Process continues in background
+- Use `process` tool to poll for results
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Exec security mode (deny, allowlist, full)
+ASTA_EXEC_SECURITY=allowlist
+
+# Allowed binaries (comma-separated)
+ASTA_EXEC_ALLOWED_BINS=ls,cat,grep,git,curl,jq
+
+# Max command timeout (seconds, default: 30)
+ASTA_EXEC_TIMEOUT_SECONDS=30
+
+# Process session TTL (seconds, default: 1800)
+ASTA_PROCESS_TTL_SECONDS=1800
+```
+
+### Injected Environment Variables
+
+Source: `~/workspace/source/backend/app/exec_tool.py:403-416`
+
+Asta injects API keys from Settings into the command environment:
+
+- `NOTION_API_KEY` (from Settings → Notion Integration)
+- `GIPHY_API_KEY` (from Settings → Giphy Integration)
+
+These are available in exec commands:
+
+```bash
+curl -H "Authorization: Bearer $NOTION_API_KEY" https://api.notion.com/v1/...
+```
+
+<Warning>
+  **Secret redaction:** Asta automatically redacts these values from command output logs. Never echo or print secrets directly.
+</Warning>
+
+### Workdir (Working Directory)
+
+Source: `~/workspace/source/backend/app/exec_tool.py:301-321`
+
+Specify a working directory for commands:
+
+```json
+{
+  "command": "git status",
+  "workdir": "/home/user/project"
+}
+```
+
+**Safety:** Workdir must be under:
+- Your home directory (`~`)
+- The Asta workspace path (`ASTA_WORKSPACE_PATH`)
+
+Other paths are rejected.
+
+## Secret Blocking
+
+Source: `~/workspace/source/backend/app/exec_tool.py:58-81`
+
+Asta blocks commands that might expose secrets:
+
+**Blocked patterns:**
+```bash
+# Dumping all env vars
+env
+printenv
+set
+
+# Echoing specific secrets
+echo $NOTION_API_KEY
+printf $OPENAI_API_KEY
+
+# Grepping secrets
+env | grep API_KEY
+```
+
+**Error:**
+```
+Command blocked: exposing API keys or tokens is not allowed.
+```
+
+This prevents accidental leaks in logs or chat history.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'Command not allowed'">
+    The binary is not in the allowlist.
+
+    **Fix:**
+    - Add it: `/allow <binary>`
+    - Or enable a skill that requires it
+    - Or switch to `full` mode (not recommended)
+  </Accordion>
+
+  <Accordion title="'Binary not found'">
+    The binary is not in PATH.
+
+    **Check:**
+    ```bash
+    which <binary>
+    ```
+
+    **Install:**
+    ```bash
+    # macOS
+    brew install <binary>
+
+    # Linux
+    sudo apt install <binary>
+    ```
+
+    Restart Asta after installation.
+  </Accordion>
+
+  <Accordion title="'Command timed out after 30s'">
+    The command took too long.
+
+    **Fix:**
+    - Increase timeout: `{"timeout_sec": 120}`
+    - Or use background mode: `{"background": true}`
+  </Accordion>
+
+  <Accordion title="'Invalid workdir'">
+    The workdir is outside allowed paths.
+
+    **Fix:** Use a path under:
+    - Home directory: `~/project`
+    - Workspace: `/home/user/workspace/source`
+
+    Absolute paths outside these are rejected.
+  </Accordion>
+
+  <Accordion title="Process output is truncated">
+    Asta caps exec output at 200,000 characters (tail).
+
+    **Fix:**
+    - Redirect to file: `command > output.txt`
+    - Use `process` tool with `log` action (supports offset/limit)
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Allowlist Mode" icon="shield">
+    Default to `allowlist` mode. Only use `full` for trusted, temporary workflows.
+  </Card>
+  <Card title="Create Skills for Workflows" icon="wand-magic-sparkles">
+    Package related binaries into skills. Auto-allowlist binaries when the skill is enabled.
+  </Card>
+  <Card title="Always Approve Commands" icon="eye">
+    Review every approval prompt. Tap "Always" only for binaries you trust.
+  </Card>
+  <Card title="Background Long Commands" icon="clock">
+    Use `{"background": true}` for commands that take >10 seconds. Poll with `process` tool.
+  </Card>
+</CardGroup>
+
+## Examples
+
+### Search Apple Notes
+
+**User:** "What notes do I have about banking?"
+
+**Asta (exec):**
+```bash
+memo notes -s "bank"
+```
+
+**Allowlist:** `memo` must be allowed (via `/allow memo` or apple-notes skill).
+
+### Commit and Push Git Changes
+
+**User:** "Commit these changes with message 'fix: typo' and push"
+
+**Asta (exec):**
+```bash
+git add . && git commit -m "fix: typo" && git push
+```
+
+**Allowlist:** `git` must be allowed.
+
+### Run Tests in Background
+
+**User:** "Run the test suite in the background"
+
+**Asta (exec):**
+```json
+{
+  "command": "npm test",
+  "background": true,
+  "workdir": "/home/user/project"
+}
+```
+
+**Allowlist:** `npm` must be allowed.
+
+### Query Notion API
+
+**User:** "Search my Notion for pages about 'product roadmap'"
+
+**Asta (exec):**
+```bash
+curl -X POST "https://api.notion.com/v1/search" \
+  -H "Authorization: Bearer $NOTION_API_KEY" \
+  -H "Notion-Version: 2022-06-28" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "product roadmap"}'
+```
+
+**Allowlist:** `curl` must be allowed.
+
+**Injected env:** `NOTION_API_KEY` is auto-injected from Settings.
+
+## Next Steps
+
+- [Creating Skills](/guides/creating-skills) - Package exec commands into reusable skills
+- [Subagent Orchestration](/guides/subagents) - Run multi-step exec workflows in the background
+- [Telegram Bot Setup](/guides/telegram-bot) - Approve exec commands from mobile
