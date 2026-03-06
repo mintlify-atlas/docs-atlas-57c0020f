@@ -1,0 +1,149 @@
+{
+  "projectType": "saas",
+  "projectName": "Asta",
+  "projectDescription": "A personal AI workspace with cross-platform desktop app, multi-provider AI support, Telegram integration, and persistent context management.",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/ai-providers",
+              "concepts/skills-system",
+              "concepts/multi-user-auth"
+            ]
+          },
+          {
+            "group": "Desktop App",
+            "pages": [
+              "desktop/overview",
+              "desktop/building",
+              "desktop/releases"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/chat",
+              "features/telegram",
+              "features/vision",
+              "features/audio-notes",
+              "features/reminders",
+              "features/learning-rag",
+              "features/spotify",
+              "features/google-workspace"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment",
+              "configuration/api-keys",
+              "configuration/skills",
+              "configuration/workspace"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/setting-up-ollama",
+              "guides/telegram-bot",
+              "guides/creating-skills",
+              "guides/subagents",
+              "guides/exec-tool"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-errors",
+              "troubleshooting/diagnostics"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core",
+            "pages": [
+              "api/authentication",
+              "api/chat",
+              "api/providers"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "api/files",
+              "api/rag",
+              "api/audio",
+              "api/cron",
+              "api/agents"
+            ]
+          },
+          {
+            "group": "Settings",
+            "pages": [
+              "api/settings",
+              "api/skills",
+              "api/spotify"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Cross-platform desktop app (macOS/Windows) with Tauri",
+    "Multi-provider AI support (Claude, Google, OpenAI, Groq, OpenRouter, Ollama)",
+    "Multi-user authentication with JWT and role-based access control",
+    "Telegram bot integration with long polling",
+    "OpenClaw-style skill system with on-demand loading",
+    "Hybrid vision pipeline with preprocessing",
+    "Audio transcription and meeting notes with faster-whisper",
+    "RAG/Learning system with Ollama embeddings",
+    "Reminders and cron scheduling with Pingram voice calls",
+    "Spotify integration with OAuth and device control",
+    "Google Workspace integration (Gmail, Calendar, Drive via gog CLI)",
+    "Subagent orchestration for background tasks",
+    "Reasoning controls with streaming support",
+    "Global shortcut (Alt+Space) for desktop app toggle"
+  ],
+  "publicApiSurface": [
+    "POST /api/chat",
+    "POST /api/chat/stream",
+    "POST /api/auth/login",
+    "POST /api/auth/register",
+    "GET /api/providers",
+    "GET /api/settings/skills",
+    "POST /api/audio/process",
+    "GET /api/audio/status/{job_id}",
+    "POST /api/rag/learn",
+    "POST /api/tasks/learn",
+    "GET /api/cron/jobs",
+    "POST /api/cron/jobs",
+    "GET /api/agents",
+    "POST /api/agents/spawn",
+    "GET /api/spotify/connect",
+    "POST /api/spotify/play",
+    "GET /api/files/list",
+    "GET /health"
+  ]
+}
